@@ -1,0 +1,2172 @@
+web攻击
+跨站脚本攻击XSS就是一种HTML的注入，和传统的buffer overflow是类似的思想，即没有对数据和代码进行有效的分离，在缓冲区溢出总，攻击者在通过超长的数据包发送覆盖了程序buffer的关键返回ret位置，导致CPU控制流的劫持，错误地把攻击者数据当作代码来执行，最后导致了缓冲区溢出。
+Cookie，指某些网站为了辨别用户身份、进行session跟踪而储存在用户本地终端上的数据(通常经过加密).服务器可以使用session来保存用户的身份信息(ID,购物车等)，但是需要用户在访问网页(发送HTTP数据包)的时候附带上相应的cookie，通过cookie中的特定值来识别sessionID，才能把单独用户和单独的session联系起来。
+
+跨站请求伪造CSRF。XSS是利用合法用户获取其信息，而CSRF是伪造成合法用户发起请求。
+
+linux
+top 命令查看cpu,mem的使用情况
+vmstat 2 每隔2秒查看一下内存，交换分区，i/o，cpu的使用情况
+df 查看磁盘的使用情况
+free -m来查看内存，交换分区使用情况
+iostat查看磁盘i/o情况
+
+
+第一章 python设计模式
+mvc模式：
+桥接模式 ： socketserver中server类 handle类
+组合模式：部分整体，树 叶子 枝干
+访问者模式：1+2+3后缀表达式、求值的处理不同，用不同的访问者类
+mixin模式：__base__可以动态改变
+__bases__属性，它是一个元组，用来存放所有的基类。与其他静态语言不同，Python语言中的基类在运行中可以动态改变。所以当我们向其中增加新的基类时，这个类就拥有了新的方法，也就是所谓的混入（mixin）
+观察者模式：订阅，通知
+代理模式：中介处理，提供访问权限之类
+备忘录模式：比如一个事务的提交与回退
+单例模式 borg模式
+Borg模式(关注的是实例的状态，只要所有的实例共享状态)
+class Borg:
+    __shared_state = {}
+	def __init__(self):
+		self.__dict__ = self.__shared_state
+状态模式：不同状态下不同处理，这个异步wsgi中用到
+抽象工厂模式：每个产品类的接口方法名相同
+策略模式：将逻辑封装在一个类中，然后使用委托的方式解决
+模板方法：把不变的框架抽象出来，定义好要传入的细节的接口。
+适应器模式：产品类的接口方法名不同时，用来兼容方法
+享元模式：cache memo
+外观模式：提供有多种功能，用接口进行各种组合
+责任链模式：web中的拦截器
+建造者模式
+装饰器模式：cache 尾递归优化 日志
+命令调度模式： do_get do_post method
+
+
+第二章 python语言特点
+
+py2 与 py3的区别
+print
+
+整数除法 py2.7 3/2 = 1  py3.4 3/2=1.5
+
+unicode 
+Py2有基于ASCII的str()类型，其可通过单独的unicode()函数转成unicode类型，但没有byte类型。
+而在Py3中，终于有了Unicode（utf-8）字符串，以及两个字节类：bytes和bytearray。
+
+在P3中，range()的实现方式与xrange()函数相同，所以就不存在专用的xrange()(惰性求值)
+
+next
+在Py2.7中，函数形式和方法形式都可以使用，而在Py3中，只能使用next()函数（试图调用.next()方法会触发AttributeError）。
+
+在Py3.4中，列表推导for循环中的变量不再会泄漏到全局命名空间中了！
+
+Py3中如果我们试图比较无序类型，会触发一个TypeError。
+
+def bad():
+    e = None
+    try:
+        bar(int(sys.argv[1]))
+    except ValueError as e:
+        print('value error')
+    print(e)
+在Py3里，在except块的作用域以外，异常对象（exception object）是不能被访问的
+如果不这样的话，Python会在内存的堆栈里保持一个引用链直到Python的垃圾处理将这些引用从内存中清除掉
+所以在py3中可以修改为
+def good():
+    exception = None
+    try:
+        bar(int(sys.argv[1]))
+    except ValueError as e:
+        exception = e
+        print('value error')
+    print(exception)
+
+
+    
+    
+第一节 python的内存管理
+1. 对象的引用计数机制
+增加： 一个对象分配一个新名称。将其放入容器时
+减少：del 重新赋值 超出作用域
+sys.getrefcount()
+创建对象的时候，Python会立即向操作系统申请分配内存，引用计数减少为0后，Python垃圾回收器执行
+2. 垃圾回收
+显式地调用gc.collect()进行垃圾回收
+
+在引用计数的基础上，通过“标记-清除”（mark-and-sweep）解决容器对象可能产生的循环引用问题
+通过“分代回收”（generation collection）以空间换时间的方法提高垃圾回收效率
+
+创建新对象，对象链接到了第0代对象集合中
+
+被分配对象的计数值与被释放对象的计数值之间的差异超过某个阈值，Python的收集机制就启动了，触发零代算法
+
+垃圾标记时，先将集合中对象的引用计数复制一份副本
+然后操作这个副本，遍历对象集合，检查其中每个互相引用的对象，根据规则减掉其引用计数。
+引用计数副本值是否为0将集合内的对象分成两类，reachable和unreachable
+unreachable被回收，reachable被移动到一个新的链表：一代链表
+
+将系统中的所有内存块根据其存活时间划分为不同的集合，每个集合就成为一个“代”，垃圾收集频率随着“代”的存活时间的增大而减小，存活时间通常利用经过几次垃圾回收来度量。
+弱代假说：首先是年亲的对象通常死得也快，而老对象则很有可能存活更长的时间
+Python默认定义了三代对象集合
+
+3.内存池
+python对象，都有其独立的私有内存池，对象间不共享他们的内存池
+小于256个字节的对象都使用pymalloc实现的分配器
+block 8，16，32，256
+一个4k的pool，维护的block大小都是一样的 freeblock链表维护释放的block
+一个256K的area，维护64个pool
+而大的对象则使用系统的 malloc
+
+第二节 基础知识
+python 拥有与直觉相同的链式比较操作,比如1 < 5 > 4
+但是同样
+1 in [1,0] == True 等价于
+(1 in [1,0] ) and ([1,0] == True)
+用enumerate(list,start=0)包装一个可迭代对象,可以同时使用迭代项和索引
+
+遍历目录方法
+for root, subFolders, files in os.walk(rootdir):
+
+
+
+用id(expression a) == id(expression b)来判断两个表达式的结果是不是同一个对象的想法是有问题的。
+foo.bar本身并不是简单的名字，而是表达式的计算结果，是一个 method object，在id(foo.bar)这样的表达式里，method eval
+比如id(foo.bar) == id(foo.__init__)
+只有你能保证对象不会被销毁的前提下，你才能用 id 来比较两个对象
+比如
+fb = foo.bar 
+Fb = Foo.bar 
+print id(fb) == id(Fb)
+
+
+Python的后期绑定（late binding）机制，指在闭包中使用的变量的值，是在内层函数被调用的时候查找的
+所以返回闭包不能引用循环变量
+def count():
+    fs = []
+    for i in range(1, 4):
+        def func(i):
+            def g():
+                return i*i
+            return g
+        fs.append(func(i))
+    return fs
+#或者可以利用函数的默认参数   
+def count():
+    fs = []
+    for i in range(1, 4):
+        def func(x=i):
+            return x*x
+	fs.append(func)
+    return fs
+    
+f1, f2, f3 = count()
+print f1(), f2(), f3()
+
+lambda 匿名函数，用于短小的回调函数
+
+赋值：创建了对象的一个新引用
+浅拷贝：创建一个新对象，包含的是对原对象中包含项的引用
+切片方法，工厂函数，copy模块的copy
+深拷贝：创建一个新对象，并且递归复制原对象包含的对象
+copy模块的deepcopy
+
+数据类型  存储模型  更新模型  访问模型
+数字       Scalar   不可更改  直接访问
+字符串     Scalar   不可更改  顺序访问
+列表      Container  可更改   顺序访问
+元组      Container 不可更改  顺序访问
+字典      Container  可更改   映射访问
+
+list，它的内存管理类似C++的std::vector
+即先预分配一定数量的内存，当预分配的用完时，又继续往里插入元素，就会启动新一轮的内存分配。list对象会根据内存增长算法申请一块更大的内存，然后将原有的所有元素拷贝过去，销毁之前的内存，再插入新元素。
+当删除元素时，也是类似，删除后发现已用空间比预分配空间的一半还少时，list会另外申请一块小内存，再做一次元素拷贝，然后销毁原有的大内存。
+对于list这种序列容器来说，除了pop(0)和insert(0，v)这种插入操作非常耗时之外，查找一元素是否在其中，也是O(n)的线性复杂度
+
+deque就是双端队列，同时具备栈和队列的特性，能够提供在两端插入和删除时复杂度为O(1)的操作。类似C++的std::deque，可以把deque想象为多个list连在一起（仅为比喻，非精确描述），“像火车一样，每一节车厢可以载客”，它的每一个“list”也可以存储多个元素。它的优势在插入时，已有空间已经用完，那么它会申请一个“车厢”来容纳新的元素，并将其与已有的其他“车厢”串接起来，从而避免元素拷贝；在删除元素时也类似，某个“车厢”空了，就“丢弃”掉，无需移动元素。所以当出现元素数量“巨变”时，它的性能比list要好上许多倍。
+
+在C语言中，标准库函数bsearch()能够通过二分查找算法在有序队列中快速查找是否存在某一元素。在Python中，对保持list对象有序以及在有序队列中查找元素有非常好的支持，这是通过标准库bisect来实现的。
+考虑 bisect 来实现 Consistent Hashing 算法，只要找到 Key 在Ring上的插入位置，其下个有效元素就是我们的目标服务器配置
+
+heapq
+最小堆: 完全平衡二叉树
+heappushpop heapreplace nsmallest nlargest heapify
+利用元组 __cmp__，可以实现优先级队列
+
+from collections import Counter
+a = Counter(list) 统计list中item出现的次数
+a.most_common(2)
+
+weakref创建Python引用，且不会阻止对象的销毁操作
+b = weakref.ref(a)
+a == b() 
+
+
+解释性：
+Python解释器把源代码转换成称为字节码的中间形式，然后再把它翻译成计算机使用的机器语言并运行
+
+词法分析、句法分析、编译、解释
+词法分析将输入的代码分解为一些符号token
+句法分析用抽象语法树来展现token之间的关系
+编译器将它转化为一个（或多个）代码对象
+解释器逐个接收这些代码对象，并执行它们所代表的代码
+函数的代码对象 foo.func_code
+函数的代码对象是函数对象的一个属性
+代码对象是在Python编译器中生成的，并且在解释器中完成解释工作
+
+字节码是代码对象众多属性中的一个
+字节码的指令不是作用于任何硬件的，而是虚拟机
+Python解释器将通过虚拟机使得字节码得以解释
+反汇编字节码(dis 模块)
+dis.dis(foo),直接分析它的函数对象。
+这其实是一种简便写法：dis.dis(foo.func_code)
+真正分析的还是代码对象
+
+
+
+
+
+
+单引号和双引号没有区别。
+三引号的形式用来输入多行文本，也就是说在三引号之间输入的内容将被原样保留，之中的单号和双引号不用转义
+
+第三节 GIL
+GIL的引入使得多线程不能在多核系统中发挥优势，在单核CPU上，由于其本质是顺序执行的，一般情况下多线程能够获得较好的性能
+对于扩展的C程序的外部调用，即使其不是线程安全的，但由于GIL的存在，线程会阻塞直到外部调用函数返回
+
+
+GIL被称为为全局解释器锁，Python虚拟机上用作互斥线程的一种机制，它的作用是保证任何情况下虚拟机中只会有一个线程被运行，而其他线程都处于等待GIL锁被释放的状态。
+每次遇到IO操作，就释放GIL锁，如果是纯计算的程序，没有 I/O 操作，解释器会每隔 100 次操作就释放这把锁，让别的线程有机会执行（这个次数可以通过 sys.setcheckinterval 来调整）
+到了python3 使用固定的时间而不是固定数量的操作指令
+
+引入GIL的原因：
+python采用引用计数的方式来进行垃圾回收，撤销对象时
+（1）引用计数减一（2）判断计数值是否为0，决定是否销毁对象
+保证虚拟机内部共享资源访问的互斥性，即两个操作的原子性。
+
+
+
+
+
+第四节 python对象协议
+(0)构造和初始化
+如果 __new__ 和 __init__ 是对象的构造器的话，那么 __del__ 就是析构器。
+它不实现语句 del x。
+它定义的是当一个对象进行垃圾回收时候的行为。当一个对象在删除的时需要更多的清洁工作的时候此方法会很有用，比如套接字对象或者是文件对象。
+注意，如果解释器退出的时候对象还存存在，就不能保证 __del__ 能够被执行
+from os.path import join
+class FileObject:
+    '''给文件对象进行包装从而确认在删除时文件流关闭'''
+    def __init__(self, filepath, filename):
+        self.file = open(join(filepath, filename), 'r+')
+    def __del__(self):
+        self.file.close()
+        del self.file
+        
+(1)类型转换的协议 __str__,__repr__,__nonzero__
+str()主要面向用户，其目的是可读性，返回形式为用户友好性和可读性都较强的字符串类型
+repr()面向的是Python解释器，或者说开发人员，其目的是准确性，其返回值表示Python解释器内部的含义
+通常obj == eval(repr(obj))
+
+(2)比较大小的协议 __cmp__ __eq__ __ne__ __lt__ __gt__ 可以实现== != < >的重载
+(3) 运算和反运算的协议
+__radd__(self, other)只是把操作数调换了位置
+__iadd__(self, other)增量赋值
+(4) 容器类型协议
+__len__(self),__getitem__(self, key),
+__setitem__(self, key, value),
+__delitem__(self, key)
+__reversed__(self) 
+__contains__(self, item)实现 in or not in 的判断
+__concat__(self, other)连接两个序列
+
+(5) 可调用协议 __call__
+(6) 可哈希 __hash__ 继承object的都默认支持
+(7) 上下文管理器协议
+with  文件、链接打开关闭，异常处理，锁分配。
+__enter__(self)  __exit__(self,exc_type,exc_value,exc_trace)
+
+(8)迭代器协议
+迭代器协议__iter__返回迭代器， next方法，返回当前元素直到StopIteration
+iter(o[, sentinel])函数返回一个迭代器对象
+没有第二个参数，那么o是一个集合对象，要么支持__iter__方法，要么支持序列协议（__getitem__方法，index从0开始）
+有sentinel，那么o是一个可调用的对象（函数），迭代器创建，调用没有参数的o，直到返回值为sentinel
+
+for语句  in/not in 语句 默认调用iter() 方法
+
+(9) 生成器 yield
+(7) 描述符协议：
+__get__(self,instance,owner)
+当我们调用 x.d, 并且 d 是一个描述符实例
+那么instance = x，owner = type(x)
+__set__(self,instance,value)
+当我们调用 x.d = val, 并且 d 是一个描述符实例
+那么instance = x，value = val
+__delete__(self,instance)
+
+
+属性 (Property) 是由 getter、setter、deleter 构成的逻辑
+@property
+def x(self):
+    return self._x
+@x.setter
+def x(self,value):
+    self._x = value
+    
+描述符
+只能在类的层次上定义描述符
+描述符就是可重用的属性
+属性总是 data descriptor，这和是否提供 setter 无关
+实现__get__和__set__方法，称为数据描述符
+仅仅实现__get__方法，称为非数据描述符
+
+实现：TypedProperty("num",int,42) 即num只能是整数
+
+class TypedProperty(object):
+    def __init__(self,name,types,default=None):
+        self.name = '_' + name
+        self.types = types
+        self.default = default if default else types()
+    def __get__(self,instance,owner):
+        return getattr(instance,self.name,self.default)
+    def __set__(self,instance,value):
+        if not isinstance(value,self.types):
+            raise TypeError("Must be a %s" % self.type)
+        setattr(instance,self.name,value)
+    def __del__(self,instance):
+        raise AttributeError("can't delete attribute")
+class Foo(object):
+    name = TypedProperty('name',str)
+    num = TypedProperty("num",int,42) 
+
+(8) 属性交互属性拦截协议
+__getattr__ (self, name)访问不存在的成员，触发  实现数据隐藏，实现代理模式
+__setattr__ (self, name, value) 对成员赋值操作，触发
+__delattr__ 删除操作，触发
+__getattribute__ 访问任何存在或不存在的成员，包括 __dict__。触发
+只有__getattribute__触发AttributeError，才会调用__getattr__
+
+不要在这几个方法里直接访问对象成员，不要用 hasattr/getattr/setattr/delattr 函数，因为它
+们会被再次拦截，形成无限循环。正确的做法是直接操作 __dict__
+
+__getattribute__ 连 __dict__ 都会拦截，只能用基类的 __getattribute__ 返回结果。
+
+(9)__missing__
+dict的子类如果定义了方法__missing__(self, key)，如果key不再dict中，那么d[key]就会调用__missing__方法，而且d[key]的返回值就是__missing__的返回值
+class MyDict(dict):
+    def __missing__(self, key):
+        self[key] = rv = []
+        return rv
+类似from collections import defaultdict
+m = defaultdict(list)
+  
+
+第五节 属性查找机制：
+get ：obj.attr 
+(1)obj.__getattribute__('attr') python提供的特殊属性，返回
+(2)在对象的类字典查找data描述符，调用__get__方法返回，同样在基类中查找（方法解析顺序MRO）
+(3)对象的字典里查找，找到返回
+(4)对象的类字典里查找，找到non-data描述符，返回，否则普通属性，也返回
+(5)抛出 AttributeError 调用__getattr__
+set 有data描述符设置，否则插入对象字典
+
+第六节 方法解析顺序MRO
+不仅是针对方法搜索，对于类中的数据属性也适用
+L[C(B1 ... BN)] = C + merge(L[B1] ... L[BN], B1 ... BN)
+L(O)=O；
+L(A)=AO；
+L(B)=B+merge(L(A))=B+merge(AO)=B+A+merge(O,O)=B,A,O
+L(C)=C+merge(L(A))=C+merge(AO)=C+A+merge(O,O)=C,A,O
+L(D)=D+merge(L(B),L(C),BC)
+   =D+merge(BAO,CAO,BC)
+   =D+B+merge(AO,CAO,C)
+(下一个计算取AO的头A，但A包含在CAO的尾部，因此不满足条件，跳到下一个元素CAO继续计算)    
+   =D+B+C+merge(AO,AO)
+   =D+B+C+A+O
+   =DBCAO
+   
+第七节 名字查找机制
+locals: 函数内部名字空间，包括局部变量和形参。
+enclosing function 外部嵌套函数的名字空间。
+globals  函数定义所在模块的名字空间。
+__builtins__  内置模块的名字空间。
+
+变量赋值
+除非使用global、nonlocal声明，否则在函数内部使用赋值语句，总是在 locals 名字空间中新建对象关联   
+
+解释器会将 locals 名字复制到 FAST 区域来优化访问速度，因此直接修改 locals 名字空间并不会影响该区域
+
+
+第八节 类
+为什么需要self参数
+在存在同名的局部变量以及实例变量的情况下使用self使得实例变量更容易被区分
+类中动态添加方法，在类风格的装饰器中没有self无法确认是返回一个静态方法还是类方法等
+
+instance method 就是实例对象与函数的结合。
+使用类调用，第一个参数明确的传递过去一个实例。
+使用实例调用，调用的实例被作为第一个参数被隐含的传递过去。
+
+classmethod 是类对象与函数的结合。
+可以使用类和类的实例调用，但是都是将类作为隐含参数传递过去
+使用类来调用 classmethod 可以避免将类实例化的开销。
+
+当一个函数逻辑上属于一个类又不依赖与类的属性的时候，可以使用 staticmethod。
+使用staticmethod可以避免每次使用的时都会创建一个对象的开销
+staticmethod可以使用类和类的实例调用。但是不依赖于类和类的实例的状态。
+在无论是类还是实例上都只是一个普通的函数
+
+__new__()方法是静态方法，而__init__()为实例方法
+__new__()方法一般需要返回类的对象，当返回类的对象时将会自动调用__init__()方法进行初始化，如果没有对象返回，则__init__()方法不会被调用。
+__init__()方法不需要显式返回，默认为None，否则会在运行时抛出TypeError
+
+当子类继承不可变类型，str,int,unicode,tuple,frozenset时，初始化在__new__完成，需要重新覆盖它才能完成初始化
+class UserSet(frozenset):
+    def __new__(cls,arg=None):
+        arg = arg.split()
+        return frozenset.__new__(cls,arg)
+__new__ 实现工厂模式、单例模式、进行元类编程
+super(type,object) 满足
+issubclasss(object,type)或者isinstance(object,type)
+如果是isinstance(object,type)，super对象是bound的，因为传入了object实例，所以如果是issubclasss(object,type)，super对象是unbound的
+>>> d = super(B,b)
+>>> type(d)
+<type 'super'>
+super 的类型参数决定了在 mro 列表中的搜索起始位置.
+总是返回该参数后续类型的成员
+class Singleton(object):
+    _singleton = None
+    def __new__(cls,*arg,**kwds):
+        if cls._singleton is None:
+            cls._singleton = super(Singleton,cls).__new__(cls,*arg,**kwds)
+        return cls._singleton
+这个例子在并发的时候可能有意外，可以加入锁
+class Singleton(object):
+    objs = {}#这里也是需要self的原因 动态
+    objs_lock = threading.Lock()
+    def __new__(cls,*args,**kwds):
+        if cls in cls.objs:
+            return cls.objs[cls]
+        cls.obj_lock.acquire()
+        try:
+            if cls in cls.objs:
+                return cls.objs[cls]
+            cls.objs[cls] = object.__new__(cls,*args,**kwds)
+            return cls.objs[cls]
+        finally:
+            cls.obj_lock.release()
+        
+        
+object和古典类没有基类，type的基类为object
+新式类中type()的值和__class__的值是一样的，但古典类中实例的type为instance，其type()的值和__class__的值不一样
+继承自内建类型的用户类的实例也是object的实例，object是type的实例，type实际是个元类（metaclass）
+
+
+
+元类：
+创建一个类时，
+如果有__metaclass__属性，那么就使用，
+反之，则寻找类的基类中是否有__metaclass__属性，
+如果有，那么使用，
+反之，则寻找模块级是否有__metaclass__属性，
+如果有，那么使用，
+反之，使用type作为类的元类
+
+class：用于用户定义的类
+type：用于内置类型
+“class”和“type”本质上并无不同
+密封类:不能被继承的类
+class SealedClassMeta(type):
+    _types = set()
+    def __init__(cls,name,bases,attrs):
+        if cls._types & set(bases)：
+        #说明需要创建的类是_types中元素的子类
+            raise SyntaxError("can't inherit from a sealed class!")
+        cls._types.add(cls)
+        
+class A(object):
+    __metaclass__ = SealedClassMeta
+
+class B(A): pass #创建的类是_types中元素的子类
+
+单例，可以被继承
+class Singleton(type):
+    def __init__(cls,name,bases,attrs):
+        super(Singleton,cls).__init__(name,bases,attrs)
+        cls.instance = None
+    def __call__(cls,*args,**kwds):
+        if cls.instance is None:
+            cls.instance = super(Singleton,cls).__call__(*args,**kwds)
+        return cls.instance
+
+__bases__属性 存放所有基类，所以基类在运行中可以动态改变，当我们向其中增加新的基类时，这个类就拥有了新的方法，就是mixin
+import mixins
+def staff()
+    people = People()
+    bases = []
+    for i in config.checked():
+        bases.append(getattr(mixins,i))
+    people.__bases__ += tuple(bases)
+    return people
+
+第九节 包：
+包即是目录，除了包含常规的Python文件（也就是模块）以外，还包含一个__init__.py文件，同时它允许嵌套
+app/
+   __init__.py
+   test.py
+   sub1/
+      __init__.py
+      mod1.py
+      string.py
+   sub2/
+      __init__.py
+      mod2.py
+      
+app/sub1/mod1.py中,
+__name__的值是app.sub1.mod1
+__package__是app.sub1
+app/sub1/__init__.py中
+__name__和__package__的值都是app.sub1
+      
+通过“.”访问符进行访问，即“包名.模块名”
+_init__.py中申明模块级别的import语句从而使其变成包级别可见
+__all__在__init__.py中指定，表示当这个模块被import * from app的时候，哪些模块会被import进来
+
+当在包的内部运行脚本的时候，包相关的结构信息都会丢失，默认当前脚本所在的位置为模块在包中的顶层位置
+在app所在的目录的位置输入Python -m app.test.py
+cat test.py
+from __future__ import absolute_import
+#absolute_import的行为变成了默认行为，如果需要应用局部的包，那就得用明确的相对引用了。
+from .sub1 import mod1
+import sub1.mod1 会 ImportError: No module named sub1.mod1
+
+import 分相对和绝对，显式相对
+import 解释器加载模块的流程
+1、sys.modules中搜索预加载模块，导入当前局部命名空间，加载结束。
+2、如果在sys.modules中找不到对应模块的名称，则为需要导入的模块创建一个字典对象，并将该对象信息插入sys.modules中。
+(搜寻在sys.path里面定义的所有目录)
+3、加载前，编译
+4、执行动态加载，在当前模块的命名空间中执行编译后的字节码，并将其中所有的对象放入模块对应的字典中。
+
+
+
+第十节 其他
+函数
+def在Python中是一个可执行的语句，当解释器执行def的时候，默认参数也会被计算，并存在函数的.func_defaults属性中
+
+列表解析
+列表解析在时间上有一定的优势，这主要是因为普通循环生成List的时候一般需要多次调用append()函数，增加了额外的时间开销
+
+双链表
+list组成的双链表，节点（前节点，后节点，值）
+root = []
+root[:] = [root, root, None]
+add一个值：
+last = root[0]
+last[1] = root[0] = [last, root, value]#新节点
+
+
+通过inspect.stack()可以获得一个堆栈列表。
+
+序列化 在multiprocessing模块常常使用
+pickle协议
+对于不可序列化的对象，如sockets、文件句柄、数据库连接等，也可以通过实现pickle协议来解决这些局限，主要是通过特殊方法__getstate__()和__setstate__()来返回实例在被pickle时的状态。
+函数和方法是不可序列化的
+
+json比pickle文件更可读，而且不依赖于python
+json是一个基于文本的格式。总是应使用utf-8字符编码以文本模式打开json文件
+json 不支持bytes对象
+json.dump(basic_entry, f, indent=2) 
+dumps方法提供了一些可选的参数：
+1、sort_keys是告诉编码器按照字典排序(a到z)输出
+2、indent参数根据数据格式缩进显示，读起来更加清晰
+3、separators参数的作用是去掉,,:后面的空格。在传输数据的过程中，越精简越好，冗余的东西全部去掉，因此可以加上separators参数
+4、
+
+对于自定义的python对象和bytes对象
+利用default参数，传入一个转换obj成dict的函数
+def to_json(obj):
+    if isinstance(obj,bytes):
+        return {'__class__': 'bytes',
+                '__value__': list(obj)
+                }
+    d = {'__class__':obj.__class__.__name__,
+        '__module__':obj.__module__
+        }
+    d.update(obj.__dict__)
+    return d
+
+json.dumps(obj,default=to_json)
+利用object_hook或者object_pairs_hook，传入一个转换dict成obj的函数
+def from_json(d):
+    if "__class__" in d:
+        if d['__class__'] == 'bytes':
+            return bytes(d['__value__'])
+        class_name = d.pop('__class__')
+        module_name = d.pop('__module__')
+        _module = __import__(module_name)
+        print("module:",_module)
+        _class = getattr(_module,class_name)
+        print("class:",_class)
+        args = dict((key,value) for key,value in d.items())
+        print("args:",args)
+        inst = _class(**args)
+    else:
+        inst = d
+    return inst
+json.loads(json_object
+
+
+csv文件
+
+
+文件在python3中
+TextIOWrapper 是文本处理层
+BufferedWriter 是缓存的io层处理字节数据
+FileIO   操作系统的文件描述符
+
+临时文件tempfile
+TemporaryFile 关闭后自动删除
+NamedTemporaryFile 
+
+异常:
+try块中发生异常的时候,如果在except语句中找不到对应的异常处理，异常将会被临时保存起来，当finally执行完毕的时候，临时保存的异常将会再次被抛出
+finally出现新的异常或者执行return，break语句，会导致异常丢失
+另外，因为try中return语句执行前，先执行finally，所以一旦finally有return，导致try中return永远无法执行
+
+eval(expression[, globals[, locals]])
+eval 是當我們要計算某一個字串中的運算, 並且 會回傳計算結果
+exec(expr, globals, locals)
+exec 是把字串當成程式碼來執行, 但是 不會回傳結果
+和 eval 不同的是, exec 可以用於 assignment 赋值
+exec("a=100")
+
+eval('[c for c in ().__class__.__bases__[0].__subclasses__() if c.__name__ =="Quitter"][0](9)',{"__builtins__": None},None)
+().__class__.__bases__[0].__subclasses__()用来显示object类的所有子类。类Quitter与"quit"功能绑定，因此上面的输入会直接导致程序退出。
+如果使用对象不是信任源，应该尽量避免使用eval，在需要使用eval的地方可用安全性更好的ast.literal_eval替代
+
+2.7与3.4不同
+LOAD_FAST　在代码对象的co_varnames属性中寻找变量名。
+LOAD_GLOBAL 在代码对象的co_names属性中寻找变量名
+LOAD_NAME　从代码对象的co_names属性读取变量名，然后依次从局域变量的字典以及全局变量的字典寻找对应的值
+
+结构体：
+array(数组支持一种类型，不支持混合类型)
+nums = array.array("i",[1,2,3,4])
+struct(二进制字节序列支持混合类型)
+s = struct.pack("2i2s", 0x12, 0x34, "ab")
+numpy定义结构数组：
+persontype = numpy.dtype({ 
+'names':['name', 'age', 'weight'],
+'formats':['S30','i', 'f']}, align= True)
+a = numpy.array([("Zhang",32,75.5),("Wang",24,65.2)], dtype=persontype)
+
+
+
+sorted(iterable[, cmp[, key[, reverse]]])
+s.sort([cmp[, key[, reverse]]])
+
+sorted()函数会返回一个排序后的列表，原有列表保持不变；而sort()函数会直接修改原有列表，函数返回为None
+sorted()作用于任意可迭代的对象，而sort()一般作用于列表
+所以sort()函数不需要复制原有列表，消耗的内存较少，效率也较高。
+cmp(e1, e2) 是带两个参数的比较函数
+key(e) 是带一个参数的函数, 用来为每个元素提取比较值
+cmp传入的函数在整个排序过程中会调用多次，函数开销较大；而key针对每个元素仅作一次处理，因此使用key比使用cmp效率要高。
+
+
+lxml和ElementTree
+
+
+第三章 html
+标签的用途、标签在浏览器中的默认样式。
+
+<em>表示强调，<strong>表示更强烈的强调。并且在浏览器中<em>默认用斜体表示，<strong>用粗体表示。两个标签相比，目前国内前端程序员更喜欢使用<strong>表示强调。
+
+<span>标签是没有语义的，它就是为了设置单独的样式用的。
+
+<q>标签，短文本引用。语义：引用别人的话。默认浏览器会对q标签自动添加双引号。
+
+<blockquote>标签，长文本引用。默认浏览器对<blockquote>标签的解析是缩进样式。
+
+<br>标签分行显示文本。在html中是忽略回车和空格的。输入空格，必须写入&nbsp;
+
+<hr>标签，添加水平横线
+
+<address>标签，为网页加入地址信息。默认在浏览器上显示的样式为斜体
+
+<code>标签，为网页加入一行代码。如果是多行代码，可以使用<pre>标签。<pre>标签不只是为显示计算机的源代码时用的，在需要在网页中预显示格式时都可以使用它
+
+使用ul，添加列表.ul-li在网页中显示的默认样式一般为：每项li前都自带一个圆点.
+
+使用ol，添加有序列表。每项<li>前都自带一个序号，序号默认从1开始。
+
+<div>标签的作用就相当于一个容器。一些独立的逻辑部分划分出来，放在一个<div>标签。逻辑部分是页面上相互关联的一组元素。如网页中独立的栏目版块，就是一个典型的逻辑部分。可以为这一个独立的逻辑部分设置一个名称，用id属性来为<div>提供唯一的名称。
+
+table标签是网页上的表格。整个表格以<table>标记开始。当表格内容非常多时，表格会下载一点显示一点，但如果加上<tbody>标签后，这个表格就要等表格内容全部下载完才会显示。<tr>表格的一行。<td>表格的一个单元格，一行中包含几对<td>，说明一行中就有几列。<th>表格表头。
+table表格在没有添加css样式之前，在浏览器中显示是没有表格线的。表头，也就是th标签中的文本默认为粗体并且居中显示。
+给表格加入边框：
+```
+<style type="text/css">
+table tr td,th{border:1px solid #000;}
+</style>
+```
+
+为表格添加标题和摘要.
+摘要：不会在浏览器中显示出来的。它的作用是增加表格的可读性(语义化)，使搜索引擎更好的读懂表格内容，还可以使屏幕阅读器更好的帮助特殊用户读取表格内容。
+语法：`<table summary="表格简介文本">`
+
+标题:用以描述表格内容，标题的显示位置：表格上方。
+<caption>标题文本</caption>
+
+<a>标签，链接到一个页面
+语法：
+```
+<a  href="目标网址" title="鼠标滑过显示的文本">链接显示的文本</a>
+```
+title属性的作用，鼠标滑过链接文字时会显示这个属性的文本内容。这个属性在实际网页开发中作用很大，主要方便搜索引擎了解链接地址的内容（语义化更友好）。
+默认文本加入a标签后，颜色就会变为蓝色，被点击过的文本颜色为紫色。
+在新建浏览器窗口中打开链接：
+```
+<a href="目标网址" target="_blank">click here!</a>
+```
+
+mailto在网页中链接Email地址。
+如果mailto后面同时有多个参数的话，第一个参数必须以“?”开头，后面的参数每一个都以“&”分隔。
+```
+<a href="mailto:a@bcd.com"?subject="sub"&body="xxxx"></a>
+```
+
+```
+<img src="地址" alt="下载失败时的替换文本" title="为图片加入鼠标滑过时的提示文本">
+```
+
+表单标签form，与用户交互
+语法：
+```
+<form   method="get/post"   action="服务器文件server.php">
+```
+表单控件（文本框、文本域、按钮、单选框、复选框等）
+input的type分为：文本输入框text、密码输入框password，单选框radio，复选框checkbox,提交按钮submit，重置按钮reset。
+```
+<input   type="text/password"   value="默认值(不常用)"    name="为控件命名以备后台程序使用"/>
+```
+
+```
+<input   type="submit/reset"   value="按钮上显示的文字"    name="为控件命名以备后台程序使用"/>
+```
+
+```
+<input   type="radio/checkbox"   value="值"    name="为控件命名以备后台程序使用"   checked="checked"/>
+
+checked：当设置 checked="checked" 时，该选项被默认选中
+```
+
+同一组的单选按钮,name取值一定要一致，这样同一组的单选按钮才可以起到单选的作用。
+
+
+文本域的两个属性可用css样式的width和height来代替：col用width、row用height来代替。
+语法：
+```
+<textarea rows="行数" cols="列数"></textarea>
+```
+
+下拉列表框，节省空间
+```
+<option value="提交值" selected="selected">选项</option>
+
+selected="selected"，则该选项就被默认选中。
+```
+
+在<select>标签中设置multiple="multiple"属性，就可以实现多选功能
+
+
+label标签。label标签不会向用户呈现任何特殊效果，它的作用是为鼠标用户改进了可用性。
+如果你在label标签内点击文本，就会触发此控件，自动选中和该label标签相关连的表单控件上。
+
+```
+<form method="post",action="server.php">
+    <lable for="username">用户名:<lable>
+    <input type="text" name="username"/>
+    <label for="pass">密码:</label>
+    <input type="password" name="pass" />
+    <lable>个人简介:</lable>
+    <textarea>输入：</textarea>
+    <label>性别:</label>
+    <label>男</label>
+    <input type="radio" value="1"  name="gender" />
+    <label>女</label>
+    <input type="radio" value="2"  name="gender" />
+</form>
+
+```
+
+
+
+
+第三章 CSS层叠样式表
+CSS中用/*注释语句*/来标明,Html中使用<!--注释语句-->。
+
+CSS 向文档中的一组元素类型应用某些规则
+第一节 样式表
+优先级从小到大：
+浏览器缺省设置
+外部样式表：<link rel="stylesheet" type="text/css" href="mystyle.css">
+内部样式表(一般情况下嵌入式css样式写在<head></head>之间)：
+<style type="text/css">
+hr {color:sienna;}
+</style>
+内联样式：
+<p style="color:sienna;margin-left:20px">This is a paragraph.</p>
+
+嵌入式>外部式有一个前提：嵌入式css样式的位置一定在外部式的后面。其实总结来说，就是就近原则（离被设置元素越近优先级别越高）。
+
+第二节 选择器
+选择器 声明块（多个声明组成，每个声明是一个属性值对）
+
+###选择器
+元素选择器 h2{color:black;}
+选择器分组 h2,p{background:white;}
+通配选择器 *{font: 18px Helvetica';border:1px solid black;}
+
+类选择器  *.warning {font-weight: bold;}
+多类选择器   *.warning.urgent {font-style: italic;}   class="urgent warning"
+id选择器  *#first {font-weight: bold;}  id="first"
+(类选择器和id选择器都可以忽略通配符)
+(和类选择器不同，ID属性不允许有空格分隔的词列表) 
+(ID选择器只能在文档中使用一次。)
+
+
+简单属性选择器h1[c] {color:black;} 
+具体属性选择器h1[c='av'] {color:black;}  
+多个属性选择器连接起来h1[c='av'][b] {color:black;} 
+（属性选择器必须完全匹配属性值）
+部分属性选择
+[foo~="bar"] 词之间用空格分隔，选择任意一个词 
+[foo^="bar"] 以bar开头
+[foo$="bar"] 以bar结尾
+[foo*="bar"] 包含bar
+*[lang|='en']/*特定属性选择器(这种属性选择器最常见的用途是匹配语言值)*/
+
+后代选择器 h1 em  作为h1元素后代的任意em元素
+选择子元素 h1 > strong 选择作为h1元素子元素的任意strong元素
+选择相邻兄弟元素 h1 + p {margin-top : 0;}
+
+伪类选择器
+对假象类的操作
+链接伪类
+:link     指向任何超链接，即包含href属性的锚(a)，
+:visited  指向已访问地址超链接
+
+动态伪类
+:focus 当前拥有输入焦点的元素
+:hover 鼠标指针停留的元素
+:active 指示被用户输入激活的元素
+
+静态伪类
+:first-child 选择作为某个元素第一个子元素的那个元素
+
+结合伪类
+a:link:hover
+
+伪元素选择器
+p:first-letter 一个块级元素首字母
+对假象元素的操作：<p><p:first-letter>f</p:first-letter>irst</p>
+p:first-line
+以上只能应用于标记或段落之类的块元素，不能应用于超链接等行内元素
+
+p:before p:after
+
+###选择器的特殊性
+选择器的特殊性：
+ID属性值                   0,1,0,0
+类属性、属性选择、伪类     0,0,1,0
+元素和伪元素               0,0,0,1
+结合符和通配符 没有贡献
+内联样式                   1,0,0,0
+
+重要声明：
+{color: #333 !important;}
+
+
+第三节 继承与层叠
+一般框模型属性（外边距，内边距，背景，边框border）不能继承。
+继承没有特殊性，连0特殊性都没有。有的文献提出它只有0.1，所以可以理解为继承的特殊性最低。
+
+层叠：按出现顺序对应用到给定元素的所有声明排序，后面的权重高
+
+权重由大到小：
+读者的重要声明
+创作人员的重要声明
+创作人员的正常声明
+读者的正常声明
+用户代理声明
+浏览器默认的样式 < 网页制作者样式 < 用户自己设置的样式
+
+字体：
+不要设置不常用的字体，如果用户本地电脑上如果没有安装你设置的字体，就会显示浏览器默认的字体。
+
+
+
+元素分类：
+块状元素、内联元素(又叫行内元素)和内联块状元素。
+设置display:block就是将元素显示为块级元素。
+1.一个块级元素独占一行
+2.元素的高度、宽度、行高以及顶和底边距都可设置。
+3.元素宽度在不设置的情况下，是它本身父容器的100%（和父元素的宽度一致），除非设定一个宽度。
+常用的块状元素有：
+<div>、<p>、<h1>...<h6>、<ol>、<ul>、<dl>、<table>、<address>、<blockquote> 、<form>
+
+通过代码display:inline将元素设置为内联元素
+1.和其他元素都在一行上；
+2.元素的高度、宽度、行高及顶部和底部边距不可设置；
+3.元素的宽度就是它包含的文字或图片的宽度，不可改变。
+常用的内联元素有:
+<a>、<span>、<br>、<i>、<em>、<strong>、<label>、<q>、<var>、<cite>、<code>
+
+通过display:inline-block将元素设置为内联块状元素
+1.和其他元素都在一行上；
+2.元素的高度、宽度、行高以及顶和底边距都可设置。
+常用的内联块状元素有：
+<img>、<input>
+
+盒模型：
+css内定义的宽（width）和高（height），指的是填充以里的内容范围。而不是盒子的宽度
+块标签都具备盒子模型的特点
+border-style（边框样式）常见样式有：
+dashed（虚线）| dotted（点线）| solid（实线）。
+border-color（边框颜色）
+border-width（边框宽度）中的宽度也可以设置为：
+thin|medium|thick（但不是很常用），最常还是用象素（px）。
+
+padding
+margin
+
+盒模型时外边距(margin)、内边距(padding)和边框(border)设置上下左右四个方向的边距是按照顺时针方向设置的：上右下左。
+
+布局模型
+在网页中，元素有三种布局模型：
+1、流动模型（Flow）
+2、浮动模型 (Float)
+3、层模型（Layer）
+
+在默认状态下的网页元素都是根据流动模型来分布网页内容的。
+1.块状元素都会在所处的包含元素内自上而下按顺序垂直延伸分布，因为在默认状态下，块状元素的宽度都为100%。
+2.内联元素都会在所处的包含元素内从左到右水平分布显示。
+
+可以通过设置float让两个快元素并排显示。
+
+层模型有三种形式：
+1、绝对定位(position:absolute)。将元素从文档流中拖出来，然后使用left、right、top、bottom属性相对于其最接近的一个具有定位属性的父包含块进行绝对定位。如果不存在这样的包含块，则相对于body元素，即相对于浏览器窗口。
+2、相对定位(position:relative)。相对于以前的位置移动，移动的方向和幅度由left、right、top、bottom属性确定，偏移前的位置保留不动。即后面的元素是显示在了元素以前位置的后面。
+3、固定定位(position:fixed)。它的相对移动的坐标是视图（屏幕内的网页窗口）本身。由于视图本身是固定的，它不会随浏览器窗口的滚动条滚动而变化，除非你在屏幕中移动浏览器窗口的屏幕位置，或改变浏览器窗口的显示大小，因此固定定位的元素会始终位于浏览器窗口内视图的某个位置，不会受文档流动影响。
+
+相对于其它元素进行定位
+1、参照定位的元素必须是相对定位元素的前辈元素：
+2、参照定位的元素必须加入position:relative;
+3、定位元素加入position:absolute，便可以使用top、bottom、left、right来进行偏移定位了。
+
+
+第四节 声明块
+###值与单位
+1em font-size
+1ex 字体小写的高度
+相对url @import url(special/to.css) 指向另一个样式表
+
+####
+background-color:#6495ed;
+background-image:url('paper.gif');
+background-repeat:repeat-x;  水平方向平铺 no-repeat;
+background-position:right top;
+
+文本对齐 text-align:center;    right;   justify; 
+文本修饰 text-decoration:overline; line-through; underline;
+文本转换 text-transform:uppercase; lowercase;  capitalize;
+文本缩进 text-indent:50px;
+
+列表样式 list-style-type:circle square upper-roman lower-alpha
+列表样式图像属性 list-style-image: url('sqpurple.gif');
+
+Margin - 清除边框区域           外边距
+Border - 边框周围的填充和内容
+Padding - 清除内容周围的区域    填充
+Content - 盒子的内容
+
+
+水平居中设置：
+如果是文本、图片等行内元素时，水平居中通过父元素设置text-align:center来实现。
+
+定宽块状元素，设置margin-left:auto;margin-right:auto
+不定宽块状元素
+1. 加入table标签,table{margin:0 auto;}
+2. 改变块级元素的 dispaly 为 inline 类型，然后使用 text-align:center 来实现居中效果。
+3. 设置.container{position:relative;left:50%}
+
+
+
+第四章 javascript
+放在<head>部分
+最常用的方式是在页面中head部分放置<script>元素，浏览器解析head部分就会执行这个代码，然后才解析页面的其余部分。
+
+放在<body>部分
+JavaScript代码在网页读取到该语句的时候就会执行。
+
+文档对象模型DOM
+
+onclick鼠标单击事件
+onmouseover鼠标经过事件
+onmouseout鼠标离开事件
+onfocus光标聚焦事件
+onblur光标失焦事件
+onselect内容选中事件
+onchange文本框内容改变事件
+onload加载事件。加载页面时，触发onload事件，事件写在<body>标签内。加载页面，可理解为打开一个新页面时。
+onload卸载事件。当用户退出页面时（页面关闭、页面刷新等），触发onUnload事件，同时执行被调用的程序。现在chrome和firefox在onunload事件中已经屏蔽了alert（）
+
+第五章  TCP socketserver
+三次握手和四次挥手
+三次握手是为了确定双方的序列码，TCP需要序列码来拼接数据
+四次挥手是为了双方都需要结束和响应结束这两步
+
+socket绑定地址，监听
+绑定的时候有一个地址重用，这个涉及到TCP里面的一个TIME_WAIT，需要等待两倍的最大生存时间。保证重发和不和新连接冲突。所以不设置地址重用，在这个期间设置同一ip和端口就会bind失败。
+
+然后用select来等待self读就绪，接受accept
+select epool的优劣：
+epoll不能处理磁盘文件的文件描述符
+每次调用select就需要描述符用户空间与内核空间的拷贝，而epoll是内核和用户空间mmap同一块内存，实现共享，速度较快。
+select会遍历全部fd，把当前进程加入fd对应的设备等待队列中。而epoll是提供注册机制，在注册的时候加入设备等待队列。
+唤醒的时候epoll有个就绪链表保存就绪的fd，而select需要在完成用户空间与内核空间的拷贝后，遍历所有fd。
+epoll监视的描述符数量不受限制。
+epoll支持水平触发和边沿触发。边沿触发是需要一直读直到EWOULDBLOCK。水平触发只要重复调用epoll就可以完成读写。
+
+
+accept之后，会调用一个专门进行数据处理的handle类
+TCP 设置的handle对socket的读写都进行了类文件的装饰，可以进行类似readline的操作。
+对于发送数据默认不缓存，接受数据默认采用系统默认缓存8192
+在accept之后，会设置是否进行nagle算法。
+Nagle算法只允许一个未被ACK的包存在于网络。当然如果对端ACK很快的，其实也等不了多少时间。（开启TCP_NODELAY）
+相应的对端有延迟ACK，在网络拥堵的情况下，在特定时间内，等待其他需要发送的数据。
+
+拥塞控制，TCP慢启动，新连接会比老连接慢一些。重传超时后也会进入慢启动
+
+websocket
+websocket则和一般的socket一样，使得浏览器和服务器建立了一个双工的通道。
+websocket通信需要先有个握手的过程，使得协议由http转变为webscoket协议，然后浏览器和服务器就可以利用这个socket来通信了
+Upgrade: websocket
+Connection: Upgrade
+Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==
+payload-len这项，表示数据的长度有多少，如果小于126，那么payload-len就是数据的长度，如果是126那么接下来2个字节是数据长度，如果是127表示接下来8个字节是数据长度，然后后面会有四个字节的mask，真实数据要由payload-data和mask做异或才能得到
+
+
+
+第六章  同步 异步 io
+asyncore.dispatcher 对socket进行封装，有create_socket listen bind connect等函数
+asyncore有一个loop循环，对加入loop循环fd进行读写控制的接口writable,readable,比如对于echo功能的server而言，writable是需要定义的，因为一旦接受数据后就需要输出
+有事件处理后就交给dispatcher类，对外接口是 handle_connect handle_accept handle_read handle_write
+
+asynchat对dispatcher类做了些高级处理，
+对于接受数据提供了终止符设置。比如http服务器而言，头部的终止符和内容的终止符不同，可以使用状态模式进行处理。在不同的状态下进行不同的处理和不同的终止符设置。
+发送数据提供了一个缓存队列，只要push进这个双端队列，那个async_chat类自己发送数据。
+
+socket 中 close和shutdown的区别
+close(sock_fd)会把sock_fd的内部计数器减1
+当sock_fd的内部计数器为0时, 才调用shutodwn(), 并最终释放文件描述符
+调用shutdown()只是进行了TCP断开, 并没有释放文件描述符
+本来正常的TCP程序不需要显示调用shutdown()
+调用shutdown()就不会CLOSE_WAIT, 只会FIN_WAIT1或FIN_WAIT2
+客户端非正常退出会给服务器带来CLOSE_WAIT
+
+
+第七章 关于中文分词
+统计模型 一阶马尔可夫模型
+一个分词完成的训练文本，把单词获取到列表中同时记录行开头。单词初始概率即句子起始出现单词的概率，单词转移概率矩阵获取在defaultdict。即在A单词出现后出现B单词的概率（防止0概率的出现，采用+1平滑。）
+一个词典文本，用于获取中文单词dict。
+涉及文本处理，unicode，二进制编码之间的转化，用于单词匹配和输出乱码，utf-8 头部“EF BB BF”
+对句子进行单词划分，把单词看成节点，组成有向图。用list存储句子每个位置可能的单词组合。通过递归的动态规划维特比算法（列出公式），递归计算的时候使用缓存。
+
+
+第八章 web
+headers = { 'User-Agent' : user_agent }
+data = urllib.urlencode(valuesDict)
+req = urllib2.Request(url, data, headers)
+request.add_data(data)
+request.add_header('User-agent', '111')
+response = urllib2.urlopen(req)
+response.read()
+for line in response:
+
+urllib.quote(string[, safe])：对字符串进行编码
+urllib.quote_plus(string [ , safe ] ) ：与urllib.quote类似，但这个方法用'+'来替换' '，而quote用'%20'来代替' '
+urllib.urlencode(query[, doseq])：将dict或者包含两个元素的元组列表转换成url参数。例如 字典{'name': 'dark-bull', 'age': 200}将被转换为"name=dark-bull&age=200"
+
+BaseHTTPRequestHandler，解析起始行和http头部，看是put还是post方法，对http版本的处理
+比如持久连接，在1.0上用keep-alive打开，而1.1上默认打开，关闭需要close
+持久连接又涉及哑代理，这个部分没看到标准库的相应处理
+资源过期 缓存再验证 Cache-Control If-Modified-Since If-None-Match
+do_GET do_POST  发送头部和发送内容
+
+cgi类似翻译层
+将动态交互请求翻译给后台的应用程序，把执行结果翻译成静态网页返回给WebServer。
+HTML表单的action 指向运行目录下cgi-bin文件夹中的python文件，把存储环境信息字典和post提交的数据传递给python文件，windows下是使用subprocess中的管道来进行当前进程和python模块的数据交换
+cgi模块下有个FieldStorage类，解析post数据和环境字典
+
+
+wsgi是Web服务器和Web应用程序之间的一种通用的接口
+app(environ, start_response) 
+app可callable，接受两个参数，environ和start_response，
+environ是一个字典包含了CGI中的环境变量
+start_response也是一个callable，接受两个必须的参数，status（HTTP状态）和response_headers（响应消息的头）。
+内部调用start_response并将响应消息的消息体返回
+http = make_server('localhost',8888,app)
+http.serve_forever()
+
+第九章 关于 web.py
+@get('/')
+def index():
+    return '<h1>Index page</h1>'
+wsgi.add_url(index)
+
+@interceptor('/manage/')
+def check_manage_url(next):
+    if current_user.isAdmin():
+        return next()
+wsgi.add_interceptor(check_manage_url)
+
+路由类参数：Route(func)
+web路由（判断是静态路由还是动态路由，如果是动态路由提供match方法）
+web方法：get post
+处理函数
+add_url，生产路由实例，用dict存储静态路由与路由实例，用list存储所有动态路由。
+
+拦截：
+拦截规则，前匹配startswith或者后匹配endswith
+如果拦截匹配，则用拦截函数包装原函数
+最后的包装函数通过add_interceptor存储在list中。
+
+
+wsgi(env, start_response)
+Request类，根据env
+利用cgi.FieldStorage(fp=self._environ['wsgi.input'], environ=self._environ)
+获取头部和内容
+拦截函数：根据路由，判断是否被intercept 
+原函数：根据方法，先匹配静态路由，最后匹配动态路由，找到需要调用的函数。
+得到结果
+Jinja2模板引擎
+
+第十章  关于异步wsgi服务器
+wsgiref的handler模块接受类文件的读写，所以主要是修改读写接口，是它们具备类文件的功能
+读数据，类文件StringIO接收，再收到终止符后，传递给handler模块
+wsgiref.handlers.SimpleHandler(写数据类文件, 写数据类文件, errors, self.environ, False, False)
+写数据，由于aynochat是push函数发送数据没有类文件的write函数和flush函数，所以需要自己定义write函数和flush函数，利用python的duck类型来模拟类文件。
+
+threading
+threading.Thread对象化
+Lock,RLock,Condition,Semaphore,local
+避免使用 thread 模块的原因是，它不支持守护线程。
+当主线程退出时，所有的子线程不论它们是否还在工作，都会被强行退出。
+threading模块支持守护线程
+守护线程一般是一个等待客户请求的服务器，如果没有客户提出请求，它就在那等着。
+如果你设定一个线程为守护线程，就表示你在说这个线程是不重要的，在进程退出的时候，不用等待这个线程退出。
+新的子线程会继承其父线程的 daemon 标志。整个 Python 会在所有的非守护线程退出后才会结束,即进程中没有非守护线程存在的时候才结束
+
+第十一章 multiprocessing
+进程之间的通信优先考虑Pipe和Queue，而不是Lock、Event、Condition、Semaphore等同步原语
+
+
+第0节 Queue
+通常直接用JoinableQueue，其内部用Semaphore 进行协调。在执行put()、task_done()时调整信号量计数器。当 task_done() 发现计数值等于0，立即通知 join() 解除阻塞 
+
+注意平台之间的差异。由于Linux平台使用fork()函数来创建进程，因此父进程中所有的资源，如`数据结构`、`打开的文件`或者`数据库的连接`都会在子进程中共享，而Windows平台中父子进程相对独立，因此为了更好地保持平台的兼容性，最好能够将相关`资源对象作为子进程的构造函数的参数`传递进去。
+
+第一节 queue
+queue是通过管道的方式进行进程间通信，为了提供超时机制，queue模块先把数据放入当前进程的双端队列(本地缓存)中，然后开一个feed线程来把双端队列中的数据发给管道的另一方。而由于这个线程的存在，进程退出时，需要join线程，而join的操作是把buffer中的数据放入管道中，而如果管道已满，而且读进程已经结束，这样buffer的数据一直在，可能导致死锁。所以queue模块提供进程退出时取消join，当然可能导致数据丢失。
+由于是管道通信，传输对象必须是可序列化的
+管道不是进程安全的，但queue是进程安全的，所以读写管道的时候需要进程锁，而queue本身需要一个有界限的信号量。而joinable需要条件量（用来等待）和信号量（用来作task加减）
+
+SimpleQueue队列，它是实现了锁机制的pipe，内部去掉了buffer，但没有提供put和get的超时处理，两个动作都是阻塞的。
+
+第二节 mmap
+除了管道方式，multiprocessing还提供通过mmap共享内存的方式来进行数据通信。虽然共享内存的value，array自带RLock锁，但是只有一次读操作或一次写操作才是安全的，像+=这种操作，就需要获取自带的可重入锁get_lock来保护数据。
+def func(val):
+	for i in range(10):
+        with val.get_lock():
+#property的set或者get操作，本身是加锁操作，但是由于+=操作，是一次get+一次set操作，所以需要额外的一次加锁，而RLock锁是支持重入的，所以没有问题
+            val.value += 1
+	if __name__ == '__main__':
+	    v = Value('i', 0)                           #使用value来共享内存 
+	    processList = [Process(target=func, args=(v,)) for i in range(10)]
+	    for p in processList: p.start()
+	    for p in processList: p.join()
+第三节 server
+最后还提供了server的方式来共享数据，有一个manager进程，负责管理实际的对象，对象存储在该进程空间。采用RPC通信的方式来处理数据，需要访问数据的进程，创建一个proxy对象，连接manager进程，把需要调用的函数参数pickle后，传递给manager进程。
+通信可以基于管道也可以基于socket所以可以分布式处理。因为分布式所以提供了身份验证功能。
+但是proxy对象中如果存在可变对象，内部的修改是不能传播到其他进程的。解决方法是将可变对象也作为参数传入。
+def f(ns,x):
+    x.append(1)
+    ns.x= x
+manager = multiprocessing.Manager()
+ns = manager.Namespace()
+p = multiprocessing.Process(target=f, args=(ns,ns.x))
+因为manager对象仅能传播对一个可变对象本身所做的修改，如有一个manager.list()对象，管理列表本身的任何更改会传播到所有其他进程。但是，如果容器对象内部还包括可修改的对象，则内部可修改对象的任何更改都不会传播到其他进程。
+
+管理的对象没有自带锁。
+def testFunc(nsum,cc):
+    for i in xrange(10):
+        nsum.value += cc
+nsum = manager.Value('tmp', 0)
+t = Process(target=testFunc, args=(nsum,1,))
+这个nsum值会不可测，最粗暴的解决方法需要进程锁
+manager.RLock()
+multiprocessing.RLock() 下面这个锁的速度比上面慢
+如果有多线程，库会为每个线程创建一个proxy对象，每个对象和server进程创建一个连接进行通信。而server进程是创建线程来和proxy对象进程通信的，所以这样可能会导致线程过多。
+
+
+第四节 pool
+三个线程
+一个等待工作进程完成工作后，给线程安全的queue传递任务结束标志
+一个从线程安全的queue里获取任务传递给进程安全的queue由工作进程去取，直到从队列中取到结束标志，然后传递pool数量个结束标志给进程安全的queue，让工作进程结束
+最后一个线程，从进程安全的queue里获取结果，通知结果处理线程（主程序）。
+对于结果的处理有map imap imap_unordered三种方式
+map提供一个list来收集数据，把结果按任务编号放入list中
+imap提供双端队列collections.deque，如果是任务标号前面的便popleft，不然用一个线程安全的条件量来等待，把大任务编号的先放入一个字典里。
+imap_unordered也采用双端队列，但不管任务编号，有数据就popleft
+pool = multiprocessing.Pool(processes=pool_size,
+initializer=start_process)
+pool_outputs = pool.map(do_calculation, inputs)
+
+
+第五节 调试多进程
+pdb.Pdb(stdin=open('p_in', 'r+'), stdout=open('p_out', 'w+')).set_trace()
+pdb.set_trace()
+只需要给pdb的构造参数传入stdin/stdout的文件对象，调试过程的输出输入就自然以传入的文件为方向了。
+这里需要两个管道文件p_in、p_out，运行脚本之前，
+使用命令mkfifo p_in p_out同时建立
+这还未完成，还需要个外部程序来跟管道交互：
+cat debug_cmd.sh
+#!/bin/bash
+cat p_out &
+while [[ 1 ]]; do
+    read -e cmd
+    echo $cmd>p_in
+done
+fifo管道在写入端未传入数据时，读取端是阻塞的（反之亦然），所以cat的显示挂在后台，当调试的程序结束后，管道传出EOF，cat就自动退出了。
+
+
+
+第十二章 gevent
+(1) greenlet
+协程和一般函数调用不同，他在栈和堆中都存在数据，而且在栈中维持一个链表，来指示栈中前一个greenlet的起始地址。
+
+(2)协程调度
+主动协调程序的运行，通过sleep主动回到主loop协程中，通过向loop注册当前协程的switch函数来重新回到此协程。sleep(0)就是通过注册switch函数，达到重新调度的功能。
+
+（3）event事件
+只有一个进程，不需要锁，所以event事件提供的wait把协程的switch添加到一个集合set中，然后回到主协程，set是把一个逐个调用集合中协程的函数注册到主loop中，达到回到协程继续操作的目的。
+
+（4）queue队列
+put提供超时机制，给主loop注册超时函数以便回到该协程抛出异常，一旦双端队列满，把数据和协程打包添加到集合中，注册一个协调调用该协程的函数回到主loop继续把数据加入队列。get也是类似。
+
+（5）pool池
+IMap IMapUnordered是协程的子类,同时也是一个迭代器
+imap的next，是往queue里取数据，没有数据即回到主loop，接着回到imap协程，对每个任务启动一个协程，如果大于pool数（由信号量来统计）则回到主loop。不然运行完此协程回到主loop并注册一个如果任务完成就往queue加入StopIteration的异常。于是开始调用各个任务协程，每个协程结束后会注册一个函数把结果put进queue，如果任务完成且之前没有加入则加入StopIteration的异常
+IMAP的next通过二分查找加入list
+IMapUnordered直接yield
+
+
+
+第十三章  libevent
+第一节 添加事件：
+定时事件，libevent 使用一个小根堆管理，key 为超时时间
+对于 Signal和 I/O事件，libevent 将其放入到一个双向链表的等待链表（wait list）中
+然后进入循环
+
+第二节 select()；
+每次循环前 libevent 会检查定时事件的最小超时时间 tv，根据 tv 设置 select()的最大等
+待时间，以便于后面及时处理超时事件
+当 select()返回后，首先检查超时事件，然后检查 I/O事件
+Libevent 将所有的就绪事件，放入到激活链表中
+然后对激活链表中的事件，调用事件的回调函数执行事件处理
+
+
+第三节 事件处理框架-event_base 
+libevent将系统提供的I/O复用机制统一封装成了eventop结构，以便统一调用
+activequeues是一个二级指针，同一优先级带有一个event链表
+eventqueue，链表，保存了所有的注册事件 event 的指针
+sig 是由来管理信号的结构体，即evsig_info
+timeheap是管理定时事件的小根堆
+
+事件注册会保证如果操作失败，没有事件会注册
+删除事件不是原子操作，可能一些成功，一些失败
+
+第四节 对于event事件结构体：
+ev_events：event关注的事件类型，包括读写事件，定时事件，信号，永久事件等等
+ev_next I/O事件在已注册事件链表中的位置。
+ev_signal_next 就是 signal 事件在 signal 事件链表中的位置
+ev_active_next：event 在激活事件链表中的位置。
+min_heap_idx 和 ev_timeout，如果是 timeout 事件，它们是 event 在小根堆中的索引和超
+时值，libevent 使用小根堆来管理定时事件
+ev_fd，对于 I/O事件，是绑定的文件描述符；对于 signal 事件，是绑定的信号
+ev_callback，event 的回调函数，被 ev_base 调用
+ev_arg：函数剩余参数
+
+eb_flags：libevent 用于标记 event信息的字段，表明其当前的状态
+event在time堆中
+event在已注册事件链表中 
+event在激活链表中
+event已被初始化
+ev_ncalls：事件就绪执行时，调用 ev_callback 的次数
+
+
+第五节 事件循环
+event_base_loop
+根据timer heap中事件的最小超时时间，计算系统I/O demultiplexer的最大等待时间。将 Timer 事件融合到系统的 I/O机制
+依然有未处理的就绪时间，就让I/O复用立即返回不必等待
+如果当前没有注册事件，就退出
+调用系统I/O demultiplexer等待就绪I/O events
+就绪signal event、I/O event插入到激活链表中
+将就绪的timer event从heap上删除，并插入到激活链表中
+
+第六节 集成信号
+和multiprocessing的处理类似，进程间通信通过socketpair来进行
+socketpair的读socket事件，注册一个读事件
+信号触发阶段：信号发生标记置1，记录信号signo，向写socket写入数据时，读socket就会得到通知，触发读事件
+Libevent会在事件主循环中检查标记，如果标记被设置就处理这些signal，讲signo的注册事件添加到激活链表中
+
+初始化阶段并不注册读socket的读事件，而是在注册信号阶段才会测试并注册
+检查 I/O 事件在各系统 I/O 机制的 dispatch()函数中完成的
+
+evsig_info：
+注册读事件的event结构体
+socket_pair
+evsigevents[signo]表示注册到信号 signo 的事件链表
+evsigcaught[NSIG]，具体记录每个信号触发的次数
+evsignal_caught，是否有信号发生的标记；是 volatile 类型，因为它会在另外的线程中被
+修改
+(
+第六节 补Volatile
+1、下一条语句不会直接使用上一条语句对应的volatile变量的寄存器内容，而是重新从内存中读取
+2、非volatile变量可能因为无用，可以进行常量替换，而被编译器优化掉 (optimize out)
+3、C/C++ Volatile变量间的操作，是不会被编译器交换顺序的。C/C++ Volatile变量，与非Volatile变量之间的操作，是可能被编译器交换顺序的。
+C/C++编译器最基本优化原理：保证一段程序的输出，在优化前后无变化。所以可能改变变量的赋值顺序。
+4、CPU本身为了提高代码运行的效率，也会对代码的执行顺序进行调整
+5、happens-before语义，就是保证Thread1代码块中的所有代码，一定在Thread2代码块的第一条代码之前完成。Volatile关键词不能保证这个语义。当然，构建这样的语义有很多方法，我们常用的Mutex、Spinlock、RWLock，都能保证这个语义
+)
+
+注册信号：
+evsignal_add(struct event *ev)
+如果信号 signo 未被注册，为 signo 注册信号处理函数
+如果事件ev_signal 还没哟注册，就注册 ev_signal 事件
+将事件ev添加到 signo的 event 链表中
+
+
+第十四章  正则表达式
+URL：[a-zA-z]+://[^\s]*
+Email：\w+([-+.]\w+)*@\w+([-.]\w+)*\.\w+([-.]\w+)*
+HTML: <(\w+)>.*?</\1>
+并联 串联  重复  
+反向引用：\<number> 或 (?P=name)，引用前面的组。
+命名捕获： (?P<name>...)
+匿名捕获：(?:...)，作为匹配条件，但不返回。
+声明
+正声明 (?=...)：组内容必须出现在右侧，不返回
+负声明 (?!...)：组内容不能出现在右侧，不返回
+反向正声明 (?<=)：组内容必须出现在左侧，不返回。
+反向负声明(?<!)：组内容不能出现在左侧，不返回
+
+用NFA来实现正则表达式匹配：
+
+1、转换
+先把中缀正则表达式转换成后缀表达式，方便编译正则表达式
+2、编译
+状态有两个指针（因为+ ？ | *的存在），一个值。
+进栈的编译片段包括，开始节点和一个结束节点的链表
+3、match
+有两个状态链表，一个是当前状态的集合，一个是下一个状态的集合，每一步改变这两个状态
+如果match到最后，状态链表中包含结束状态，则匹配
+
+难点：很多二级指针的使用。
+
+
+第十五章  工作
+
+（1）开发：观察者模式，函数指针与表驱动结合，采用不确定自动状态机的汤普森算法实现正则表达式匹配
+（2）优化：提前计算，延迟计算，减少函数调用的层次，数据结构合理布局，bitmap。
+（3）编译问题
+整改：
+工具检测，然后优化：
+提前计算：有些变量，需要计算一次，多次使用的时候，提前计算一下，保存结果
+延迟计算：最近用不上的变量，就不要去初始化
+减少函数调用的层次：函数层次越多，有用的事情做的就越少（函数的入栈，出栈）
+大数据结构的合理布局：相近处理的数据放在结构体的附近，跨page
+bitmap，位图是用的比较多的一种，vlan有4094个，占内存，占包空间
+
+用设计模式对代码优化：
+函数指针和表驱动方法结合，比如对命令行的处理，不同命令有不同的函数接口
+观察者模式，数据更新的时候发布给所有订阅者，比如vlan数据增删改
+
+
+第十六章 操作系统
+虚拟存储器：
+将主存看成是一个存储在磁盘上的地址空间的高速缓存，只保留活动区域，并根据需要在磁盘和内存之间传递数据。
+作为存储器保护机制，是否可读可写，段错误
+为每个进程提供一个一致的地址空间，并保证不被其他进程破环。
+
+
+
+日志的处理：高端内存
+linux中内核使用3G-4G的线性地址空间，只有1G的地址空间可以用来映射物理地址空间
+小于896M物理地址空间的称之为低端内存，和3G开始的线性地址是一一对应映射的,也就是说内核使用的线性地址空间3G--(3G+896M)和物理地址空间0-896M一一对应
+剩下的128M的线性空间用来映射剩下的大于896M的物理地址空间，这也就是我们通常说的高端内存区
+
+高端内存的最基本思想：借一段地址空间，建立临时地址映射，用完后释放，达到这段地址空间可以循环使用，访问所有物理内存。
+
+交换机的处理是重启不刷新高端内存
+
+
+第十七章 makefile文件：
+targets : prerequisites  
+command  
+make 会在当前目录下找名字叫“Makefile”或“makefile”的文件
+找文件中的第一个目标文件（target）
+目标文件不存在，或是目标文件所依赖的后面的.o文件的文件修改时间要比目标文件新，那么，他就会执行后面所定义的命令来生成目标文件。
+如果目标文件所依赖的.o文件也存在，那么 make 会在当前文件中找目标为.o 文件的依
+赖性，如果找到则再根据那一个规则生成.o 文件
+
+make自动推导：只要 make 看到一个[.o]文件，它就会自动的把[.c]文件加在依赖关系中
+
+读入所有的 Makefile
+读入被 include 的其它 Makefile。
+初始化文件中的变量。 
+推导隐晦规则，并分析所有规则。
+为所有的目标文件创建依赖关系链。  
+根据依赖关系，决定哪些目标要重新生成。 
+执行生成命令。 
+
+依赖关系：编译器都支持一个“-M”的选项，即自动找寻源文件中包含的头文件，并生成一个依
+赖关系。cc -M main.c，而gcc -MM main.c 排除那些标准库的头文件
+自动化变量：
+$@  表示规则中的目标文件集。
+$%  仅当目标是函数库文件中，表示规则中的目标成员名
+
+变量替换：
+foo := a.o b.o c.o  
+bar := $(foo:%.o=%.c) 
+
+
+第十八章  硕士：
+
+通过http传输。
+1)	客户端修改数据后，需要手动选择同步才会将数据同步到服务器。
+2)	服务器仅提供数据的存储功能，不能修改用户数据。
+
+通告是指服务器向客户端发出通知，要求客户端向服务器发起同步请求。
+客户端主动同步。
+
+同步初始化决定正常同步和恢复性同步。
+客户端发送同步锚点，数据ID编号和修改时间，还有一些同步协商数据，包括同步方向等。
+同步锚点匹配成功，ID映射表正常
+同步锚点包含本次同步和上次同步的时间
+ID是客户端和服务器分别对于一个数据条目的编号
+
+之后开始同步
+冲突判断，决定哪些数据需要更新，哪些数据需要发给客户端
+发送
+
+
+
+VoIP设备开启后：
+1：向VoIP服务提供商注册。
+2：获取定位信息。XML格式的位置信息，通过HELD或者DHCP协议。基于http
+3：获取呼叫中心的连接信息。实现自动拨号，缓存紧急呼叫通信录，通过定位位置到服务中心的翻译协议查询映射服务器。
+4：拓展SIP协议，应用层的信令控制协议
+INVITE -> 100 Trying -> 180 Ringing -> 200 OK ->ACK
+SIP解析模块、SIP状态机模块
+SIP解析模块:SIP头部解析
+头部加入紧急呼叫服务唯一标识，SIP URI，呼叫用户的SIP URI，位置信息
+
+
+第十九章  本科：
+数码相机定标模型。根据对已知形状的物体拍摄图像，精确确定两部相机的相对位置
+1）	给出数码相机定位的基本原理，建立了物体与像一一对应模型
+2）	负责世界坐标系、光心坐标系、图像坐标系、像素坐标系之间的空间坐标变换
+3）	特殊点搜索算法，建立针孔模型、切线模型和近似椭圆模型
+4）	建立两部固定相机相对位置的数学模型
+
+
+第二十章  sql
+列顺序、别名影响结果集 as可以省略
+SELECT column_name AS alias_name,SUM(OrderPrice)
+FROM table_name AS alias_name
+WHERE city LIKE 's%' 
+    AND city LIKE 'L_n_on' 
+    OR city IN (C1,C2) 
+    AND price BETWEEN 10 AND 20
+GROUP BY column_name #结合合计函数，根据列对结果集进行分组
+HAVING SUM(OrderPrice)<2000 #WHERE无法与聚合函数一起使用
+ORDER BY column_name,column_name ASC|DESC
+LIMIT 2,5 #记录从第三个位置开始返回，共返回5个
+
+select sex,id from u4 group by 1 desc;
+select sex,age from u4 group by 1 having age>45;
+having的age必须在select中出现，或者having用聚合函数
+select sex from u4 group by 1 having count(id)>2;
+
+select * from u4 order by age desc,id desc;
+
+
+
+无关子查询与相关子查询
+子查询的执行的次数依赖于外部查询，外部查询每执行一行，子查询执行一次
+
+INNER JOIN 与 JOIN 相同 取两表相匹配的数据
+FULL OUTER JOIN 只要其中一个表中存在匹配，则返回行
+LEFT JOIN 从左表返回所有行，没有匹配则为NULL
+RIGHT JOIN 和LEFT JOIN 相反
+SELECT column_name(s)
+FROM table1
+INNER JOIN table2
+(LEFT JOIN table2)
+(FULL OUTER JOIN table2
+ON table1.column_name=table2.column_name;
+
+UNION 操作符用于合并两个或多个 SELECT 语句的结果集
+列出所有在中国和美国的不同的雇员名
+SELECT E_Name FROM Employees_China
+UNION
+SELECT E_Name FROM Employees_USA
+
+CREATE TABLE Orders
+(
+Id_O int NOT NULL UNIQUE CHECK (Id_P>0),
+PRIMARY KEY (Id_O),
+FOREIGN KEY (Id_P) REFERENCES Persons(Id_P)
+City varchar(255) DEFAULT 'SANDNES'
+)
+
+视图让用户只看到他们所需要的数据
+CREATE VIEW view_name AS
+SELECT column_name(s)
+FROM table_name
+WHERE condition
+
+INSERT INTO table_name (column1,column2,column3,...)
+VALUES (value1,value2,value3,...);
+
+存储过程：为了以后的使用而保存多条sql语句
+sql语句执行的时候要先编译，然后执行。存储过程就是编译好了的一些sql语句
+触发器是特殊的存储过程，在特点数据库活动发生时自动执行
+比如插入时，把列改为大写
+CREATE TRIGGER a
+ON table
+FOR INSERT,UPDATE
+AS
+UPDATE table
+SET state=Upper(state)
+WHERE table.id = inserted.id
+
+事物处理：
+BEGIN TRANSACTION
+...
+SAVEPOINT delete1
+...
+COMMIT TRANSACTION
+...
+ROLLBACK TRANSACTION delete1
+
+游标
+DECLARE a CURSOR
+FOR
+SELECT *
+OPEN CURSOR a
+LOOP
+FETCH a INTO b
+EXIT WHEN a%NOTFOUND
+END LOOP
+CLOSE a
+
+
+
+UPDATE table_name
+SET column1=value1,column2=value2,...
+WHERE some_column=some_value;
+
+DELETE FROM table_name
+WHERE some_column=some_value;
+
+
+MySQL
+索引用于快速找出在某个列中有一特定值的行
+大多数MySQL索引(PRIMARY KEY、UNIQUE、INDEX和FULLTEXT)在B树中存储。只是空间列类型的索引使用R-树，并且MEMORY表还支持hash索引。
+
+一般来说，列的值唯一性太小，不适合建索引（怎样叫太小？一半说来，同值的数据超过表的百分之15，那就没必要建索引了）
+太长的列，可以选择只建立部分索引，（如：只取前十位做索引）
+更新非常频繁的数据不适宜建索引
+
+
+
+mysql -uroot -proot -h127.0.0.1 
+配置文件my.ini
+启动服务 net start mysql
+关闭服务 net stop mysql
+create(alter/drop) database huang
+数据类型:
+整数 tinyint smallint int 等
+浮点数
+日期时间(Year Time Data Datetime TimeStamp) 这个类型使用比较少，因为涉及到跨区的问题
+字符类型 char varchar tinytext text mediumtext enum set
+
+数据表：
+父表和子表必须使用相同的存储引擎InnoDB
+default-storage-engine=INNODB
+
+外键列和参照列，如果是字符长度可以不同，如果是整数长度和符号位都要相同
+外键列和参照列必须创建索引，如果外键列不存在索引，mysql自动创建
+
+create table tb (
+id smallint unsigned auto_increment primary key,
+username varchar(20) not null unique key,
+sex enum('1','2','3') default 3,
+age tinyint unsigned not null ,
+salary float(8,2) unsigned);
+
+show columns from tb;
+
+insert tb values('tom',25,3834.34);
+insert tb (username,salary) values('john',3243.34);
+
+select * from tb;
+父表
+create table p (
+id smallint unsigned auto_increment primary key,
+pname varchar(20) not null);
+
+子表 两个索引 一个主键索引 一个外键索引
+create table u2 (
+id smallint unsigned auto_increment primary key,
+username varchar(10) not null,
+pid smallint unsigned,
+foreign key (pid) references p (id) on delete cascade);
+
+【
+ PRIMARY KEY (`id`),
+ KEY `pid` (`pid`), 系统自己创建
+】
+
+约束：
+primary key
+unique key
+foreign key
+not null
+default
+
+外键约束的参照操作
+cascade 父表删除或更新时自动删除或更新子表中匹配的行
+set null 父表删除或更新时设置子表中为null
+restrict 拒绝对父表删除或更新
+no action 标准sql关键字，mysql
+
+添加删除列，添加多列不能指定after,first
+alter table u1 add age tinyint unsigned not null default 10 after pid;
+alter table u1 drop age;
+
+添加约束
+alter table u3 add {constraint pk_u3_id} primary key (id);
+alter table u3 add unique (username);
+ALTER TABLE u3 ADD INDEX index_name(column_list) 
+alter table u3 add foreign key (pid) references p (id);
+alter table u3 alter age set default 15;
+
+删除默认约束
+alter table u3 alter age drop default;
+
+删除主键约束
+alter table u3 drop primary key;
+
+删除唯一约束
+alter table u3 drop index username;
+show index from u3\G;以网格形式查看约束
+
+删除外键约束
+show create table u3;
+其中CONSTRAINT `u3_ibfk_1` FOREIGN KEY (`pid`) REFERENCES `p` (`id`)
+alter table u3 drop foreign key u3_ibfk_1
+删除外键约束的索引
+alter table u3 drop index pid
+
+修改字段名称、数据结构、位置
+alter table u3
+modify id smallint unsigned not null first
+
+alter table u3
+change pid p_id tinyint unsigned not null;
+change除了修改列定义外还可以修改列名称
+
+少修改表名和列名，因为有视图等
+alter table u3 rename u_3
+rename table u_3 to u3
+
+让id保持递增
+insert u3 values(NULL,'b',123);
+insert u3 values(default,'b',123);
+
+insert test(username)
+select username from u4;
+
+create table goods_brands(
+brand_id smallint unsigned primary key auto_increment,
+brand_name varchar(40) not null
+)
+select brand_name from goods group by brand_name
+
+可以使用子查询
+insert u4 set username='t',passwd=456;
+【
+子查询是指嵌套在查询内部，且必须出现在括号内
+子查询可以返回标量、一行、一列、子查询
+外层查询可以是 select insert update set do
+(sql是结构化查询语言，所以查询是指sql语句)
+
+对平均值的小数点后两位进行四舍五入
+select id,name,price from goods where price >=(select round(avg(price),2) from goods);  
+
+any,some,all修饰比较运算符子查询
+select id,name,price from goods where price >=all(select price from goods where cate='abc');
+== any 和in相同
+<> all 和not in相同
+】
+
+
+单表更新
+update u4
+set age=age+id,sex=0
+where id%2=0;
+
+表的参照关系
+{[inner|cross] join | {left|right} [outer] join}
+inner join内连接
+left [outer] join 左外连接
+一般用on来设定连接条件，用where进行结果集记录的过滤
+
+多表更新
+update goods as g
+inner join goods_brands as b
+on g.brand_name = b.brand_name
+set g.brand_name = b.brand_id;
+
+alter table goods
+change goods_cate cate_id smallint unsigned not null,
+change brand_name brand_id smallint unsigned not null;
+
+select goods_id,goods_name,cate_name,brand_name
+from goods as g
+inner join goods_brands as b on b.brand_id = g.brand_id
+inner join goods_cates as c on c.cate_id = g.brand_id
+
+查找所有分类及其父类
+SELECT s.type_id,s.type_name,p.type_name
+FROM tdb_goods_types AS s
+LEFT JOIN tdb_goods_types AS p
+ON s.parent_id = p.type_id;
+
+select p.type_id,p.type_name,count(c.type_name)
+from tdb_goods_types as p
+left join tdb_goods_types as c
+on c.parent_id = p.type_id 
+group by p.type_name#没有这行，count会导致只有一行数据
+order by p.type_id;
+
+事实的外键(区别于物理的外键foreign key)
+
+
+单表删除
+delete u4 from u4 where id=5;
+
+多表删除
+delete t1 from tdb_goods as t1
+left join (select goods_id,goods_name from tdb_goods group by goods_name having count(goods_name) > 1) as t2
+on t1.goods_name = t2.goods_name
+where t1.goods_id > t2.goods_id;
+  
+字符函数
+select contact(first_name,last_name) as fullname from test;
+select contact_ws(' ',first_name,last_name) as fullname from test;
+format(12334.123,2)
+lower upper length ltrim rtrim
+trim(leading '?' from  '??MySQL???');
+trim(trailing '?' from '??MySQL???');
+trim(both '?' from '??MySQL???');
+substring('MySQL',1,2);
+substring('MySQL',1);
+replace('?My?sql?','?','');
+left('sdfs',2) right
+[not] like
+select * from t where name like "%1%%" escape '1';
+
+date_add('2014-3-4',interval 365 day);
+
+自定义函数
+函数体由合法的sql语句构成，如果是符合结果，用begin,end
+create function f2(n1 smallint unsigned,n2 smallint unsigned)
+returns float(10,2) unsigned
+return (n1+n2)/2;
+
+delimiter //
+
+create function addu(username varchar(20))
+returns int unsigned
+begin
+insert test(username) values(username);
+return last_insert_id();
+end//
+
+存储过程
+存储过程经常对表进行操作，而很少用函数对表进行操作
+存储过程可以返回多个值，而函数只能返回一个值
+存储过程一般独立执行，而函数一般作为其他sql语句的组成部分
+经常把常用的操作封装成存储过程以提高效率
+
+sql语句和控制语句的预编译集合，以一个名称存储并作为一个单元处理
+in表示参数必须在调用存储过程时指定
+out 可以被存储过程改变，并且可以返回
+inout 调用时指定，可以改变和返回
+
+存储过程定义完成后不能修改过程体
+
+create procedure sp1() select version();
+call sp1;
+
+参数名不能和数据表中记录名相同
+create procedure func(IN p_id int unsigned,OUT cnt int unsigned)
+begin
+delete tdb_goods_types from tdb_goods_types where type_id = p_id;
+select count(type_id) from tdb_goods_types INTO cnt;
+end//
+调用call func(15,@nums)
+select @nums
+set @nums = 7 
+@nums用户变量，对于本客户端有效
+
+ROW_COUNT()返回修改的记录总数
+
+create procedure removeByPidReturn(IN pid int unsigned,OUT delnum int unsigned,OUT outnum int unsigned)
+begin
+delete tdb_goods_types from tdb_goods_types where parent_id=pid;
+select ROW_COUNT() into delnum;
+select count(type_id) from tdb_goods_types into outnum;
+end//
+
+存储引擎（表类型）
+mysql讲数据以不同的技术存储在文件或内存中，这个技术称为存储引擎，包括存储机制、索引技巧、锁定水平
+mysql支持以下存储引擎MyISAM,InnoDB,Memory,CSV,Archive
+并发控制
+共享锁(读锁) 排他锁(写锁)
+锁的颗粒，指锁定时的单位。锁会增长系统开销
+表锁，开销最小的锁策略
+行锁，开销最大(可能对每个行分别加锁)的锁策略，支持最大并发操作
+
+事务处理
+为了保证数据库的完整性
+原子性 一致性 隔离性 持久性 acid
+
+外键
+保证数据一致性的策略
+
+索引：对数据表中一列或多列的值进行排序的一种结构
+快速访问数据表的特定信息
+普通索引，唯一索引，全文索引，btree索引，hash索引
+InnoDB：最大支持64TB，支持事务安全，支持索引，支持行锁，支持外键
+MyISAM:最大支持256TB，不支持事务安全，支持索引，支持表锁，支持数据压缩，不支持外键
+Memory：存储在内存中，不支持事务安全，支持索引，支持表锁，不支持外键
+create table tp1(
+id smallint unsigned
+)engine = MyISAM;
+alter table tp1 engine = InnoDB;
+
+数据库优化
+避免出现页面访问错误：由于数据库连接timeout产生5xx错误，慢查询造成页面无法加载，由于事务阻塞(可能因为锁)造成数据无法提交
+增加数据库的稳定性
+
+结构良好的sql及有效的索引，数据库表结构(根据范式)，系统配置(打开文件数。mysql是基于文件的，每查询一个表都要打开一些文件)，硬件(cpu的选择,大内存,io设备的选择)
+
+sql语句优化
+通过mysql的慢查询日志对有效率问题的sql进行监控
+时间、主机信息、执行信息(查询时间，锁时间等)、执行时间戳、sql内容
+对慢查询日志进行分析的工具
+mysqldumpslow -t 3 log执行次数、时间 sql语句
+
+
+pt-query-digest log 比上面的具体
+查询总数，不同的查询数量，查询时间范围
+执行时间和锁时间(最大，最小 95%)，具体sql的时间
+关注点：
+1、查询次数多且每次查询占用时间长的sql
+2、io大的sql：分析中的Rows examine项，扫描行数越多，io消耗越大
+3、未命中索引的sql：分析中Rows examine和Rows Send的对比，如果扫描行数远远大于发送的行数，说明命中率并不高
+
+使用explain查询sql的执行计划
+
+explain select * from tdb_goods_types where type_id>2 and type_id<5;
+本例中type:range,possible_keys:primary,key:primary,key_len:2，extra:Using where; Using index
+返回的type显示连接使用了何种类型，从最好到最差const(对主键和唯一索引的查找)/eq_reg(主键和唯一索引的范围查找)/ref(基于索引的查找)/range(索引的范围查找)/index(索引的扫描)/ALL(表扫描)
+key为实际使用的索引
+key_len：mysql查询以页为单位，长度越小，索引数量越多，效果越好
+extra:
+using filesort 使用了外部文件需要优化
+using temporary使用临时表需要优化
+
+max查询可以通过覆盖索引(完全通过索引来找到记录)来查询优化
+explain select max(goods_price) from tdb_goods\G;
+table: tdb_goods
+type: ALL
+rows: 20
+Extra: 
+
+create index idx_price on tdb_goods(goods_price);
+explain select max(goods_price) from tdb_goods\G;
+table: NULL 不查询表，因为索引是顺序排列的，max是最后一个
+type: NULL
+rows: NULL
+Extra: Select tables optimized away
+
+select count(*),count(id) from t;
+count(id)不包含id为null的行，*包含所有行
+select count(goods_price=6888.0 or null) from tdb_goods;
+结果是价格为6888.0的行数
+select count(goods_price=6888.0) from tdb_goods;
+结果是所有行数
+
+把子查询优化优化成连接join查询
+select * from t where t.id in (select t1.tid from t1)
+需要注意的是join会出现重复数据(因为一对多的关系)
+用distinct来去重复
+select distinct t.id from t join t1 on t.id = t1.tid;
+
+groupby查询用到临时表和文件排序
+select actor.name,count(*)
+from film_actor
+join actor on film_actor.actor_id = actor.actor_id
+group by film_actor.actor_id
+改写：先查询得到id和数量的表，再和id与name的表join
+用了索引取代临时表和文件排序
+select actor.name,c.cnt
+from actor join (
+select actor_id,count(*) as cnt
+from film_actor
+group by actor_id
+) as c
+on film_actor.actor_id = actor.actor_id
+
+limit常用于分页处理，时常伴随order by，会使用filesorts导大量io问题
+select goods_id,goods_name from tdb_goods order by goods_name limit 200,5;
+会使用文件排序(看执行计划(用explain))
+优化:
+1、使用有索引的或者主键进行order by
+这样有个问题，从大数字开始时，扫描行(205行)也会增加
+2、记录上次返回的主键，在下次查询中使用主键过滤
+select goods_id,goods_name from tdb_goods where goods_id >=200 and goods_id<210  order by goods_id limit 0,5;
+扫描行为5行
+
+索引
+如果索引包含所有列，则称之为覆盖索引
+重复索引是指相同的列以相同的顺序建立的同类型索引，导致效率变低，比如primary key和unique同时索引
+冗余索引是指多个索引的前缀相同，或者联合索引中包含了主键索引(因为InnoDB每个索引都会包含主键)，比如id primary key和key(name,id)
+搜索冗余索引
+From statistics a join statistics b ON
+a.seq_in_index = b.seq_in_index and a.column_name = b.column_name
+where a.seq_in_index = 1 and a.index_name <> b.index_name
+或者使用工具 pt-duplicate-key-checker
+
+
+在where从句，group by从句，order by从句，on从句中出现的列
+索引字段越小越好
+离散度大的列放到联合索引的前面
+select * from payment where staff_id = 2 and customer_id = 584;
+select count(distinct customer_id),count(distinct staff_id) from payment;
+值越大离散度越大，可选择性越高
+建立联合索引index(customer_id,staff_id)
+
+通过慢查询 pt-index-usage log分析索引的使用情况，以便删除
+
+表结构优化
+使用简单的数据结构。int比varchar处理简单
+尽可能使用not null定义字段，允许null需要额外字段来存储
+尽量少用text,非用不可时考虑分表，提高主表效率
+
+用int类型进行时间存储，使用from_unixtime(int)和unix_timestamp('2014-1-1 13:23:12')
+用bigint存储ip地址,使用inet_aton() inet_ntoa()
+
+范式化设计
+第三范式：要求数据表中不存在非关键字段对任意候选关键字段的传递函数依赖
+解决：数据冗余 写入异常
+
+反范式化：以空间换取时间，因为关联表会影响效率
+
+表的垂直拆分
+把不常用字段放入一个表
+把大字段单独放入一个表
+把常用字段放入一个表
+
+表的水平拆分
+按id进行hash，比如mod(id,n)分成n张表
+跨分区表的数据查询
+统计及后台报表操作
+
+操作系统优化：tcp和打开文件限制
+配置文件优化：my.cnf my.ini
+innodb_buffer_pool_size 缓冲池大小，总内存的75%
+innodb_buffer_pool_instances 缓冲池个数
+innodb_log_buffer_size 日志缓冲区大小，存每秒事务的日志
+inoodb_flush_log_at_trx_commit 刷新到磁盘的方式，0每一秒才把变更刷新，1每次提交刷新到磁盘，2每次提交刷新到缓冲区，默认1安全
+innodb_read_io_threads innodb_write_io_threads
+读写io线程的数目
+innodb_file_per_table默认off，所有表使用共享表空间，on分成多个文件
+innodb_stats_on_metadata刷新表的统计信息以便优化器使用正确的索引，设为off，在show时不刷新，人为刷新
+
+配置向导工具 percona
+
+
+
+
+
+第二十一章 SQLite
+SQLite是一种嵌入式数据库，它的数据库就是一个文件
+对于支持事务的数据库，在Python数据库编程中，当游标建立之时，就自动开始了一个隐形的数据库事务。
+Python就内置了SQLite3
+conn = sqlite3.connect('test.db')
+cursor = conn.cursor()
+cursor.execute('select * from user where id=?', '1')
+使用Cursor对象执行insert，update，delete语句时，执行结果由rowcount返回影响的行数，就可以拿到执行结果。
+使用Cursor对象执行select语句时，通过featchall()可以拿到结果集。结果集是一个list，每个元素都是一个tuple，对应一行记录
+values = cursor.fetchall()
+cursor.close()
+conn.close()
+
+1、reserved LOCK
+RESERVED锁意味着进程将要对数据库进行写操作。某一时刻只能有一个RESERVED 
+RESERVED锁和SHARED锁可以共存，而且可以对数据库加新的SHARED锁。
+
+2、pending LOCK
+LOCK意味着进程已经完成缓存中的数据修改，并想立即将更新写入磁盘
+它将等待此时已经存在的读锁事务完成，但是不允许对数据库加新的SHARED LOCK
+
+3、exclusive LOCK
+SQLite只有库级排斥锁（EXCLUSIVE LOCK）,
+
+SQLite有三种不同的事务类型.事务可以从DEFERRED，IMMEDIATE或者EXCLUSIVE，一个事务的类型在BEGIN命令中指定：
+BEGIN [ DEFERRED | IMMEDIATE | EXCLUSIVE ] TRANSACTION；
+
+deferred事务,不获取任何锁，直到它需要锁的时候。
+Immediate事务会试着获取RESERVED LOCK。如果成功，BEGIN IMMEDIATE保证没有别的连接可以写数据库。但是，别的连接可以对数据库进行读操作，但是RESERVED LOCK会阻止其它的连接BEGIN IMMEDIATE或者BEGIN EXCLUSIVE命令，SQLite会返回SQLITE_BUSY错误。
+这时你就可以对数据库进行修改操作，但是你不能提交，当你COMMIT时，会返回SQLITE_BUSY错误，这意味着还有其它的读事务没有完成，得等它们执行完后才能提交事务。
+Exclusive事务会试着获取对数据库的EXCLUSIVE锁。这与IMMEDIATE类似，但是一旦成功，EXCLUSIVE事务保证没有其它的连接，所以就可对数据库进行读写操作了。
+
+SQLAlchemy
+把关系数据库的表结构映射到对象上
+ORM技术：Object-Relational Mapping
+ORM框架的作用就是把数据库表的一行记录与一个对象互相做自动转换
+
+
+
+第二十二章   电子邮件
+Mail User Agent——邮件用户代理
+Mail Transfer Agent——邮件传输代理，Email服务提供商
+Mail Delivery Agent——邮件投递代理
+
+Email从MUA发出去，不是直接到达对方电脑，而是发到MTA
+MTA会把Email投递到邮件的最终目的地MDA
+Email到达MDA后，存放在服务器某个特殊的数据库里，即电子邮箱
+
+发件人 -> MUA -> MTA -> MTA -> 若干个MTA -> MDA <- MUA <- 收件人
+1 编写MUA把邮件发到MTA
+2 编写MUA从MDA上收邮件
+发邮件时，MUA和MTA使用的协议就是SMTP
+Simple Mail Transfer Protocol
+后面的MTA到另一个MTA也是用SMTP协议
+收邮件时，MUA和MDA使用的协议有两种：POP
+Post Office Protocol，目前版本是3，俗称POP3
+IMAP：Internet Message Access Protocol，目前版本是4
+不但能取邮件，还可以直接操作MDA上存储的邮件，比如从收件箱移到垃圾箱，等等。
+
+
+
+
+第二十三章 算法
+选择排序和希尔排序 堆排序 快速排序不稳定
+
+
+选择排序：找到最小值，放到起始位置，再从剩余序列里如此操作
+交换操作[0,n-1],比较操作：n(n-1)/2
+最差时间复杂度О(n²)
+最优时间复杂度О(n²)
+平均时间复杂度О(n²)
+最差空间复杂度О(n) total, 辅助空间O(1)
+
+冒泡排序：前后比较，大的在后，小的在前
+鸡尾酒排序
+最差时间复杂度	O(n^2)
+最优时间复杂度	O(n)
+平均时间复杂度	O(n^2)
+冒泡排序需要O(n^2)次交换
+
+插入排序：取下个元素，向前扫描，找到位置
+最差时间复杂度	O(n^2)
+最优时间复杂度	O(n)
+平均时间复杂度	O(n^2)
+最差空间复杂度	总共O(n) ，需要辅助空间O(1)
+
+shell排序：在插入排序基础上，递减增量排序算法1,4,13...
+最差时间复杂度	根据步长串行的不同而不同。
+已知最好的: O(n\log^2 n)
+最优时间复杂度	O(n)
+平均时间复杂度	根据步长串行的不同而不同
+最差空间复杂度	O(n)
+
+归并排序：申请空间合并两个已排序的序列，将串行每相邻两个数字进行归并操作，然后再次归并……
+分两种：递归和迭代
+比较操作的次数介于(nlogn)/2和nlogn-n+1。
+赋值操作的次数是(2nlogn)
+最差时间复杂度	O(nlog n)
+最优时间复杂度	O(n)
+平均时间复杂度	O(nlog n)
+最差空间复杂度	O(n)
+
+快速排序：选择一个基准pivot，大于基准在后，小于基准在后，称之为partition操作，递归地把两个子数列排序
+分两种：是否原地(in-place)分区
+
+
+
+
+延迟计算
+class lazyproperty(object):
+    def __init__(self, func):
+        self.func = func
+
+    def __get__(self, instance, cls):
+        if instance is None:
+            return self
+        else:
+            value = self.func(instance)
+            setattr(instance, self.func.__name__, value)
+            return value
+
+        
+class Circle(object):
+    def __init__(self, radius):
+        self.radius = radius
+
+    @lazyproperty
+    def area(self):
+        print('Computing area')
+        return math.pi * self.radius ** 2
+
+    @lazyproperty
+    def perimeter(self):
+        print('Computing perimeter')
+        return 2 * math.pi * self.radius
+
+
+
+
+
+
+
+
+
+
