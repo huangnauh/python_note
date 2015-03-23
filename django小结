@@ -1,0 +1,693 @@
+django
+
+
+python manage.py syncdb
+syncdb 命令参照 INSTALLED_APPS 设置，并在你的 settings.py 文件所配置的数据库中创建必要的数据库表
+即使再修改Model属性再做一次syncdb，对于已经sync的Model会忽略掉。
+Django 1.7
+python manage.py migrate
+makemigrations: 基于当前的model创建新的迁移策略文件
+migrate: 用于执行迁移动作
+sqlmigrate: 显示迁移的SQL语句
+
+给你的模型添加__unicode__()方法是很重要的，不仅是让你在命令行下有明确提示，而且在Django自动生成的管理界面中也会使用到对象的呈现。
+
+Django通过在ROOT_URLCONF配置来决定根URLconf.
+Django在URLconf中的所有URL模式中，查找第一个匹配的条目，将调用相应的视图函数。
+视图函数返回一个HttpResponse
+Django转换HttpResponse为一个适合的HTTP response， 以Web page显示出来
+
+
+from django.views.decorators.csrf import csrf_exempt
+@csrf_exempt是为了禁用Django的CSRF保护功能
+
+template/post.html
+```
+<h2 class="post-title"><a href="{% url 'detail' id=post.id %}">{{ post.title }}</a></h2>
+```
+
+1. 当点击这个文章题目时, 这个id被传送到name='detail'的url中
+
+mysite/urls.py
+```
+url(r"^(?P<id>\d+)/$",'article.views.detail',name='detail')
+```
+在URL里的参数,传递到视图中去的时候,是按顺序传递,当然使用命名组就可以顺序颠倒。
+使用命名组和字典来传递额外的参数到视图函数中
+
+2. 正则表达式匹配后取出id, 然后将id传送到article.views.detail作为函数参数
+
+article/views.py
+```
+def detail(request,id):
+    try:
+        post = Article.objects.get(id=str(id))
+    except Article.DoesNotExist:
+        raise Http404
+    return render(request,"post.html",{'post':post})
+```
+通过get方法获取对应的数据库对象, 然后对对应的模板进行渲染, 发送到浏览器中.
+
+```
+from django.http import HttpResponse
+from django.template import loader, Context
+class GbkHttpResponse(HttpResponse):
+    def __init__(self,content=b'',*args,**kwargs):
+        super(GbkHttpResponse,self).__init__(content=content,*args,**kwargs)
+        self._charset = "GBK"
+response = GbkHttpResponse(content_type='text/csv')
+response['Content-Disposition'] = 'attachment; filename={0}.csv'.format(filename)
+```
+首先表明返回的是一个 csv 格式的文件，指定输出名称
+```
+t = loader.get_template('csv.html')
+c = Context({
+    'data': address,
+})
+response.write(t.render(c))
+```
+t.render(c)返回的值是一个Unicode对象
+再通过 loader 来找到需要的模板，然后生成一个 template 对象,再生成一个 Context 对象,它就是一个字典集。然后 t.render(c) 这个用来对模板和提供的变量进行合并处理，生成最终的结果。最后调用 response.write() 将内容写入。
+
+或者,下面采用GbkHttpResponse没有效果
+```
+response = HttpResponse(content_type='text/csv')
+response['Content-Disposition'] = 'attachment; filename={0}.csv'.format(filename)
+writer = csv.writer(response)
+writer.writerow(['First row', 'Foo', 'Bar', 'Baz'])
+```
+
+模板中句点查找规则
+字段查找foo["bar"]
+属性查找foo.bar
+方法调用foo.bar()
+列表类型索引foo[bar]
+反向迭代{% for p in person_list reversed %}
+forloop.count,循环计数器
+forloop.first,第一次开始循环(布尔值)
+forloop.last,最后一次循环.(布尔值)
+
+
+
+session 存在于 request 对象的 session 属性中。
+session 是存放在数据库中的
+
+
+分页
+```
+from django.core.paginator import Paginator
+paginator = Paginator(posts,3)
+post_list = paginator.page(1)
+post_list.object_list
+post_list.paginator.num_pages
+```
+
+```
+{% if post_list.has_previous %}
+<li><a href="?page={{ post_list.previous_page_number }}">上一页</a></li>
+{% endif %}
+```
+
+
+使用Generic Views显示列表的views.py
+```
+from django.views.generic import ListView
+from address.models import Address
+class AddressList(ListView):
+    model = Address
+    paginate_by = 10
+```
+
+为 address 应用增加了address/urls.py
+```
+from django.conf.urls import patterns, url
+from address.views import AddressList
+urlpatterns = patterns('',
+    url(r'^$', AddressList.as_view()),
+)
+```
+
+需要的模板文件名为： app_label/model_name_list.html ，这是缺省要查找的模板名
+创建 templates/address/address_list.html
+在模板中可以使用address_list或者object_list,is_paginated, page_obj, paginator
+
+静态文件
+将'django.contrib.staticfiles'添加进了INSTALLED_APPS
+Django从STATICFILES_FINDERS知道静态文件的目录，常用的是FileSystemFinder,AppDirectoriesFinder
+一旦多个app下的css文件相同，这依赖于INSTALLED_APPS中app的排列顺序
+
+filter
+创建app/templatetags 目录
+```
+from django import template
+register = template.Library()
+@register.filter(name="change_gender")
+def change_gender(value):
+    pass
+```
+
+
+在 Django 中， Tag 的处理分为两步。
+编译。即把 Tag 编译为一系列的 django.template.Node 结点。
+渲染(Render)。即对每个 Node 调用它们的 render() 方法，然后将输出结果拼接起来。
+当Django编译一个模板时，它将原始模板分成一个个节点。每个节点都是django.template.Node的一个实例，并且具备 render() 方法。 于是，一个已编译的模板就是 节点 对象的一个列表.
+
+render() 方法接受一个 context 参数。这个参数就是在执行模板的渲染时由 View 传入的。你可以修改 context ，这样达到注入新变量的目的。
+模板处理引擎在发现一个 Tag 的名字之后，将进行调用的方法接受两个参数:
+parser 这是模板处理引擎对象
+token是正在被解析的语句,token.contents 是包含有标签原始内容的字符串,token.split_contents() 方法按空格拆分参数同时保证引号中的字符串不拆分。
+返回一个 Node 的实例
+```
+class CurrentTimeNode(template.Node):
+    def render(self,context):
+        return datetime.datetime.now().strftime(self.format_string)
+@register.tag(name="current_time")
+def do_current_time(parser,token):
+    return CurrentTimeNode()
+```
+
+WSGI是一种Web服务器网关接口。它是一个Web服务器（如nginx）与应用服务器（如uWSGI服务器）通信的一种规范。
+uwsgi同WSGI一样是一种通信协议，而uWSGI是实现了uwsgi和WSGI两种协议的Web服务器。
+
+nginx具备优秀的静态内容处理能力，支持的并发数也高，同时能够提供负载均衡等功能.将动态内容转发给uWSGI服务器，这样可以达到很好的客户端响应。
+
+proxy_pass指令也是把请求转发给其他服务器处理，但是默认采用HTTP协议
+使用uswgi_pass命令时，nginx会先把请求按照按照uwsgi协议转换（http -> wsgi）然后再转发给其他服务器处理
+
+http协议本身是一个文本协议，虽然它对人很友好（可读性强），但是对计算机来说就不太友好了，解析起来非常耗时，所以在转发之前先把转换成其他协议（通常是二进制协议，譬如uwsgi)
+
+uWSGI还提供了一个工具:uwsgitop命令，用来检测自身运行状态：
+#
+https://github.com/unbit/uwsgitop.git
+# 启动uWSGI，并添加--stats参数
+uwsgi ...  --stats 127.0.0.1:9191
+# 运行uwsgitop命令
+uwsgitop 127.0.0.1:9191 
+
+
+python web 程序的部署方式
+fastcgi ，通过flup模块来支持的
+spawn-fcgi，这个是fastcgi多进程管理程序，lighttpd安装包附带的，和flup效果一样，区别是flup是 python代码级引入，spawn-fcgi是外部程序
+uwsgi包括4部分组成:uwsgi协议,web server内置支持协议模块,application服务器协议支持模块,进程控制程序
+
+
+Gunicorn:
+
+gunicorn的实现里面，默认30秒超时，你要保证一个request在30秒以内有输出，或者增大这个时间。
+WORKER TIMEOUT 意味着timeout这么点时间里面没有任何输出
+gevent的那个worker一旦出现timout意味着某个地方block住了
+而十之八九是MySQL，django的ORM生成各种SLOW SQL来着
+MySQL这东西啊，在gevent下就是个巨坑，mysql 的驱动用C写的，不会切换
+修改mysql的驱动做到能利用gevent的自动切换，但如果是gunicorn同步模式就没有这个必要
+node.js吧，并发大概是gevent2倍强力，运维就惨烈了，而且是callback hell
+
+psycopg2中的一些高级功能(psycopg2是Postgres的Python驱动)。
+一个是自动提交模式。在这个模式里，psycopg2不会发出BEGIN/COMMIT，每个查询跑在自己的单语句事务里。这对不需要事务的只读查询特别有用。开启很简单:
+
+connection.autocommit = True
+开启自动提交后，我们的应用服务器和数据库之间的对话大减，数据库服务器的CPU用量也大减。而且，我们是用PGBouncer作为连接池，开启自动提交后，连接的归还也更快了。
+
+psycopg2还有一个很有用的功能，它可以通过注册一个等待回调(wait callback)函数，提供协同程序(coroutine)支持。它可以支持跨连接查询，对命中多个节点的查询非常有用，当有数据时，socket会被唤醒(我们利用Python的select模块来处理唤醒)。它也可以与eventlet和gevent等多线程库很好的协作，参考实现可见psycogreen。
+
+http://gunicorn.readthedocs.org/en/latest/index.html
+http://my.oschina.net/u/90679/blog/106725
+
+gunicorn是基于”pre-fork worker”模型，这就意味着有一个中心主控master进程，由它来管理一组worker进程。这个主控进程并不知晓任何客户端，所有的请求和响应都完全是由多个worker进程来处理.
+
+pre-fork服务器和fork服务器相似，通过一个单独的进程来处理每条请求。
+不同的是，pre-fork服务器会通过预先开启大量的进程，等待并处理接到的请求。
+
+同步workers,大多数情况下，采用的worker类型是同步方式，也就是说一次仅处理一个请求。
+异步workers，通过gevent
+在处理请求时，gunicorn依靠操作系统来提供负载均衡。通常我们推荐的worker数量是：(2 x $num_cores) + 1
+
+连接django和uwsgi，实现简单的WEB服务器
+编写django_wsgi.py文件,与文件manage.py同一个目录下
+```
+reload(sys)
+sys.setdefaultencoding("utf8")
+os.environ.setdefault("DJANGO_SETTINGS_MODULE","django_blog.settings")
+from django.core.wsgi import get_wsgi_application
+application = get_wsgi_application()
+```
+uwsgi --gevent 100 --http :8000 --module django_wsgi
+
+或者采用
+gunicorn django_wsgi -w 4 -b 127.0.0.1:8007 -k gevent --max-requests 500 --access-logfile=%(access_log)s --error-logfile=%(error_log)s --daemon
+
+gunicorn 配置文件
+# cat gun.conf
+import os
+bind = '127.0.0.1:8007'
+workers = 4
+backlog = 2048
+worker_class = "gevent"
+debug = True
+proc_name = 'gunicorn.proc'
+pidfile = '/tmp/gunicorn.pid'
+logfile = '/var/log/gunicorn/debug.log'
+loglevel = 'debug'
+
+
+
+Nginx+uWSGI+Django的实现方式
+编写django_socket.xml文件，让Nginx采用8007端口与uWSGI通讯，与文件manage.py同一个目录下
+```
+<uwsgi>
+    <socket>:8007</socket>
+    <chdir>~/django_blog</chdir>
+    <module>django_wsgi</module>
+    <processes>4</processes> <!-- 进程数 --> 
+    <daemonize>uwsgi.log</daemonize>
+</uwsgi>
+```
+nginx.conf添加以下配置
+```
+    server {
+        listen       8000;
+        server_name 54.191.239.9;
+        access_log  /home/ubuntu/log/django.log;
+uwsgi的        location / {
+            include        uwsgi_params;
+            uwsgi_pass     127.0.0.1:8007;
+        }
+gunicorn的        location / {
+            proxy_pass     http://127.0.0.1:8007;
+            proxy_set_header Host $host;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        }
+        location /static/ {
+            alias  /home/ubuntu/django_blog/static_resources/;
+        }
+
+    }
+```
+
+python manage.py collectstatic
+(设置STATIC_ROOT)
+启动uWSGI服务器 Nginx服务器
+uwsgi -x django_socket.xml
+nginx -s  reload
+sudo service nginx restart
+
+http://michal.karzynski.pl/blog/2013/06/09/django-nginx-gunicorn-virtualenv-supervisor/
+
+
+
+email的配置
+EMAIL_USE_TLS = True
+EMAIL_HOST = "smtp.gmail.com"
+EMAIL_PORT = 587
+EMAIL_HOST_USER = 'huanglibo2010@gmail.com'
+EMAIL_HOST_PASSWORD = ''
+DEFAULT_FROM_EMAIL = EMAIL_HOST_USER
+
+from django.core.mail import send_mail
+send_mail(subject, message, from_email, recipient_list, fail_silently=False, auth_user=None, auth_password=None, connection=None, html_message=None)
+
+subject:邮件主题
+message:邮件正文
+from_email: 发件人
+recipient_list: 接收人列表(群发,可以看到相互间的邮件地址.) 
+fail_silently:如果发送错误,是否抛出异常
+auth_user: 登录邮件服务器的用户名
+connection: 会话连接
+html_message: html格式正文
+
+模版文件里表单包含{% csrf_token %}
+处理带有CRSF验证的表单的时候,使用RequestContext
+render(request,'contact.html',{"form":form},context_instance=RequestContext(request))
+
+http://segmentfault.com/blog/mutoulbj/1190000000358284
+http://django-china.cn/topic/124/
+http://andrew-liu.gitbooks.io/django-blog/content/sou_suo_he_readmore.html
+
+http://www.weiguda.com/blog/7/
+
+
+
+RabbitMQ celery django
+RabbitMQ支持持久化。如果RabbitMQ挂掉，消息并不会丢失，当队列重启，一切都会回来。
+虚拟主机（virtual host），交换机（exchange），队列（queue）和绑定（binding）
+一个虚拟主机持有一组交换机、队列和绑定。
+RabbitMQ当中，用户只能在虚拟主机的粒度进行权限控制。
+队列Queues是消息messages的容器，消息就一直在里面，直到有客户端Consumer连接到这个队列并且将其取走为止。队列是由消费者Consumer通过程序建立的。
+交换机是一个由绑定构成的路由表。每个消息都有一个称为路由键routing key的属性，就是一个简单的字符串。交换机当中有一系列的绑定binding，即路由规则routes。
+
+你的消费者程序要负责创建你的交换机。每个交换机在自己独立的进程当中执行，因此增加多个交换机就是增加多个进程。
+一个绑定就是一个基于路由键将交换机和队列连接起来的路由规则。
+
+交换机类型
+Fanout Exchange不处理路由键。一个发送到交换机的消息都会被转发到与该交换机绑定的所有队列上。
+Direct Exchange消息与一个特定的路由键完全匹配。
+Topic Exchange将路由键和某模式进行匹配。
+
+当Producer发布消息的时候，首先是发布到Exchange，然后RabbitMQ根据Exchange的类型和逻辑来判断应该发送到哪个Queue中.Publisher在发出信息的时候就可以指定不同的routing_key来选择如何分发消息
+
+
+持久化：
+队列和交换机有一个创建时候指定的标志durable
+对于一个需要在重启之后回复的消息来说，它需要被写入到磁盘上，而即使是最简单的磁盘操作也是要消耗时间的。
+
+当你将消息发布到交换机的时候，可以指定一个标志“Delivery Mode”（投递模式）
+将交换机设成 durable。
+将队列设成 durable。
+将消息的 Delivery Mode 设置成2 。
+
+无法在创建绑定的时候设置成durable，如果你绑定了一个durable的队列和一个durable的交换机，RabbitMQ会自动保留这个绑定。
+
+RabbitMQ 不允许你绑定一个非坚固（non-durable）的交换机和一个durable的队列。反之亦然。要想成功必须队列和交换机都是durable的。
+一旦创建了队列和交换机，就不能修改其标志了。
+
+
+http://blog.charlee.li/django-celery-rabbitmq-intro/
+安装RabbitMQ
+sudo apt-get install rabbitmq-server
+
+celery -A tasks worker --loglevel=info
+启动一个worker，把tasks中的任务放到队列中。
+
+
+settings.py，在INSTALLED_APPS中加入以下内容：
+
+INSTALLED_APPS = (
+  ...
+  'djcelery',          # 加入celery
+  'celerytest',        # 测试应用程序
+}
+
+在settings.py末尾添加RabbitMQ的配置：
+
+Broker消息队列 ，用来发送和接受消息,RabbitMQ，不要使用数据库作为你的AMQP Broker
+
+RabbitMQ将任务队列放到内存里面，不需要去访问硬盘。其次，consumers并不需要频繁地去轮询因为RabbitMQ能将新的任务推送给consumers。当然，如果RabbitMQ真出现问题了，至少也不会影响到你的web应用。
+
+具有优先级的consumers
+CELERY_QUEUES = (
+    Queue('default', Exchange('default'), routing_key='default'),
+    Queue('for_task_A', Exchange('for_task_A'), routing_key='for_task_A'),
+    Queue('for_task_B', Exchange('for_task_B'), routing_key='for_task_B'),
+)
+
+定义routes用来决定不同的任务去哪一个queue
+CELERY_ROUTES = {
+    'my_taskA': {'queue': 'for_task_A', 'routing_key': 'for_task_A'},
+    'my_taskB': {'queue': 'for_task_B', 'routing_key': 'for_task_B'},
+}
+
+celery worker -E -l INFO -n workerA -Q for_task_A celery worker -E -l INFO -n workerB -Q for_task_B
+
+
+这个其实就是不要传递Database对象（例如一个用户的实例）给任务，因为没准序列化之后的数据已经是过期的数据了。所以最好还是直接传递一个user id，然后在任务执行的时候实时的从数据库获取。
+
+
+
+
+django-celery，backend保存结果和状态Database backend，也可以是Cache backend
+
+
+import djcelery
+djcelery.setup_loader()
+BROKER_URL = 'amqp://guest:guest@localhost:5672/'
+CELERY_IMPORTS=("celerytest.task")
+CELERY_RESULT_BACKEND="djcelery.backends.database:DatabaseBackend"
+#CELERY_RESULT_BACKEND='djcelery.backends.cache:CacheBackend'
+CELERY_ACCEPT_CONTENT = ['json']
+CELERY_TASK_SERIALIZER = 'json'
+CELERY_RESULT_SERIALIZER = 'json'
+或者
+BROKER_HOST = "localhost"
+BROKER_PORT = 5672
+BROKER_USER = "guest"
+BROKER_PASSWORD = "guest"
+BROKER_VHOST = "/"
+
+如果使用mod_wsgi部署Django，在.wsgi模块中也要有：
+import djcelery
+djcelery.setup_loader()
+
+配置数据库选项，因为djcelery要用到数据库
+
+$ python manage.py syncdb
+
+from celery import task
+@task
+def add(x, y):
+  return x + y
+  
+$ python manage.py celery worker --loglevel=info
+$ python manage.py celeryd -l info --settings=settings
+
+
+或者不配置CELERY_IMPORTS=("celerytest.task")
+在settings.py目录下定义celery.py
+```
+from __future__ import absolute_import
+import os
+from celery import Celery
+from django.conf import settings
+# set the default Django settings module for the 'celery' program.
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'django_blog.settings')
+app = Celery('django_blog')
+# Using a string here means the worker will not have to
+# pickle the object when using Windows.
+app.config_from_object('django.conf:settings')
+#Celery will automatically discover tasks in reusable apps if you follow the tasks.py 
+app.autodiscover_tasks(lambda: settings.INSTALLED_APPS)
+@app.task(bind=True)
+def debug_task(self):
+    print('Request: {0!r}'.format(self.request))
+```
+同样在__init__.py下加入
+
+```
+from __future__ import absolute_import
+# This will make sure the app is always imported when
+# Django starts so that shared_task will use this app.
+from .celery import app as celery_app
+```
+
+
+/usr/bin/supervisord             --  supervisor服务守护进程
+/usr/bin/supervisorctl           --  supervisor服务控制程序，比如：status/start/stop/restart xx 等
+/etc/supervisor/supervisord.conf --  配置文件，定义服务名称以及接口等等
+
+
+postgres
+http://wiki.zoomquiet.io/pythonic/PsycopgJson
+http://postgresapp.com/
+
+https://functionwhatwhat.com/json-in-postgresql/
+The json data type is basically the same as text in terms of behaviour and storage, but the database checks that the value is valid JSON. This was introduced in PostgreSQL 9.2.
+
+With JSON functions and operators http://www.postgresql.org/docs/9.3/static/functions-json.html
+introduced in PostgreSQL 9.3 one can 
+select authors->1->'fullName' from book 
+to get the full name of the first author of every book. It is even possible to create indexes that traverse JSON values with indexes on expressions.http://www.postgresql.org/docs/9.3/static/functions-json.html
+
+
+
+PostgreSQL客户端。
+sudo apt-get install postgresql-client
+PostgreSQL服务器。
+sudo apt-get install postgresql
+登录PostgreSQL控制台
+sudo su postgres -c psql
+为postgres用户设置一个密码
+CREATE USER ubuntu WITH PASSWORD 'huanglibo';
+创建用户数据库，这里为exampledb，并指定所有者为dbuser
+CREATE DATABASE exampledb OWNER ubuntu;
+exampledb数据库的所有权限都赋予ubuntu
+GRANT ALL PRIVILEGES ON DATABASE exampledb to ubuntu;
+
+使用shell命令行。
+创建数据库用户ubuntu，并指定其为超级用户。
+sudo -u postgres createuser --superuser ubuntu
+登录数据库控制台，设置dbuser用户的密码，完成后退出控制台。
+sudo -u postgres psql
+\password ubuntu
+在shell命令行下，创建数据库exampledb，并指定所有者为dbuser。
+sudo -u postgres createdb -O ubuntu exampledb
+
+以新用户的名义登录数据库，这时使用的是psql命令。
+psql -U ubuntu -d exampledb -h 127.0.0.1 -p 5432
+
+
+MIDDLEWARE_CLASSES = (
+    'django.middleware.common.CommonMiddleware',
+    'django.contrib.sessions.middleware.SessionMiddleware',
+    'django.contrib.auth.middleware.AuthenticationMiddleware',
+    'django.middleware.transaction.TransactionMiddleware',
+)
+关掉自动提交模式
+
+
+
+缓存
+Memcached 是一个高性能的分布式内存对象缓存系统，用于动态Web应用以减轻数据库负载。
+http://beginman.sinaapp.com/blog/83/
+1.Memcached
+sudo apt-get install memcached
+#启动例子
+/usr/bin/memcached -d -m 100 -c 1000 -u root -p 11211
+-d 选项是启动一个守护进程
+-m 是分配给Memcache使用的内存数量，单位是MB，默认64MB
+-M return error on memory exhausted (rather than removing items)
+-u 是运行Memcache的用户，如果当前为root 的话，需要使用此参数指定用户
+-l 是监听的服务器IP地址，默认为所有网卡
+-p 是设置Memcache的TCP监听的端口，最好是1024以上的端口
+-c 选项是最大运行的并发连接数，默认是1024
+-P 是设置保存Memcache的pid文件
+-f chunk size growth factor (default: 1.25)
+-I Override the size of each slab page. Adjusts max item size(1.4.2版本新增)
+
+Memcached不能持久化,当服务器重启后,内存的东西都没了
+pip install python-memcached
+django中配置memcached.
+(1).根据你所选择上述的两者来设置 BACKEND:django.core.cache.backends.memcached.MemcachedCache 或者 django.core.cache.backends.memcached.PyLibMCCache
+(2).设置LOCATION IP:port值.这里要对应系统中启动的memcached的ip和端口,见上述.或者是unix:path值,这里要对应Memcached在linux中socket文件路径.
+
+CACHES = {
+    'default': {
+    'BACKEND': 'django.core.cache.backends.memcached.MemcachedCache',
+    'LOCATION': '127.0.0.1:11211',            
+        }
+    }
+#方式2:
+CACHES = {
+    'default': {
+    'BACKEND': 'django.core.cache.backends.memcached.MemcachedCache',
+    'LOCATION': 'unix:/usr/bin/memcached.sock',            
+        }
+    }
+#方式3:
+CACHES = {
+    'default': {
+    'BACKEND': 'django.core.cache.backends.memcached.MemcachedCache',
+    'LOCATION': [
+            '172.19.26.240:11211',
+            '172.19.26.242:11211',
+            ]
+        }
+    }
+
+2.数据库缓存
+首先创建缓存表
+python manage.py createcachetable [cache_table_name]
+然后配置settings.py中CACHES:
+CACHES = {
+    'default': {
+    'BACKEND': 'django.core.cache.backends.db.DatabaseCache',
+    'LOCATION': 'my_cache_table',        
+    }
+}
+
+Django Redis Cache
+pip install hiredis
+pip install django-redis-cache
+pip install django-redis
+CACHES = {
+    "default": {
+        "BACKEND": "redis_cache.RedisCache",
+        "LOCATION": "unix:/tmp/redis.sock:1",
+        "OPTIONS": {
+            "PASSWORD": "",
+            "PICKLE_VERSION": -1,   # default
+            "PARSER_CLASS": "redis.connection.HiredisParser",
+            "CLIENT_CLASS": "redis_cache.client.DefaultClient",
+        },
+    },
+}
+
+3.文件系统缓存
+CACHES = {
+    'default': {
+    'BACKEND': 'django.core.cache.backends.filebased.FileBasedCache',
+    'LOCATION': '/var/tmp/django_cache',        
+    }
+}
+
+配置的文件可读写,每个缓存值将被存储为单独的文件，其内容是Python的pickle模块以序列化(“pickled”)形式保存的缓存数据。 每个文件的名称是缓存键，以规避开安全文件系统的使用。
+
+4.本地内存缓存
+如果你想利用内存缓存的速度优势，但又不能使用Memcached，可以考虑使用本地存储器缓存后端。 此缓存的多进程和线程安全。
+CACHES = {
+    'default': {
+    'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
+    'LOCATION': 'unique-snowflake'        
+    }
+}
+
+二.Cache参数
+1.TIMEOUT:超时时间,秒为单位,默认300s
+2.OPTIONS:CACHE后端选项,MAX_ENTRIES表示最大量,当超过这个量后会被删除,默认300.CULL_FREQUENCY表示删除的比例,默认是3,表示删除的比例是1/3, 0 意味着当达到 max_entries 时,缓存将被清空.
+CACHES = {
+    'default': {
+                'BACKEND': 'django.core.cache.backends.filebased.FileBasedCache',
+                'LOCATION': '/var/tmp/django_cache',
+                'TIMEOUT': 60,
+                'OPTIONS': {
+                        'MAX_ENTRIES': 1000
+        }
+    }
+}
+
+三.站点级缓存
+MIDDLEWARE_CLASSES = (
+    'django.middleware.cache.UpdateCacheMiddleware',     #第一
+    'django.middleware.common.CommonMiddleware',
+    'django.middleware.cache.FetchFromCacheMiddleware',  #最后
+)
+
+然后在settings.py中加入如下:
+CACHE_MIDDLEWARE_ALIAS: 用于存储缓存的别名,默认是default.
+CACHE_MIDDLEWARE_SECONDS: 每个页面应该被缓存的秒数。
+CACHE_MIDDLEWARE_KEY_PREFIX ：如果缓存被多个使用相同Django安装的网站所共享，那么把这个值设成当前网站名，或其他能代表这个Django实例的唯一字符串，以避免key发生冲突。 如果你不在意的话可以设成空字符串。
+缓存中间件缓存每个没有GET或者POST参数的页面。 或者，如果CACHE_MIDDLEWARE_ANONYMOUS_ONLY设置为True，只有匿名请求（即不是由登录的用户）将被缓存。 如果想取消用户相关页面（user-specific pages）的缓存，例如Djangos 的管理界面，这是一种既简单又有效的方法。 CACHE_MIDDLEWARE_ANONYMOUS_ONLY，你应该确保你已经启动AuthenticationMiddleware。
+此外，缓存中间件为每个HttpResponse自动设置了几个头部信息：
+当一个新(没缓存的)版本的页面被请求时设置Last-Modified头部为当前日期/时间。
+设置Expires头部为当前日期/时间加上定义的CACHE_MIDDLEWARE_SECONDS。
+设置Cache-Control头部来给页面一个最长的有效期，值来自于CACHE_MIDDLEWARE_SECONDS设置。
+
+四.视图级别缓存
+from django.views.decorators.cache import cache_page
+@cache_page(60 * 15)
+def my_view(request):
+    pass
+    
+和站点缓存一样，视图缓存与 URL 无关。 如果多个 URL 指向同一视图，每个视图将会分别缓存。 且该方法对视图和缓存进行耦合了。
+
+五.URLconf 中指定视图缓存
+from django.views.decorators.cache import cache_page
+urlpatterns = ('',
+    (r'^foo/(\d{1,2})/$', cache_page(60 * 15)(my_view)),
+)
+
+六.模板碎片缓存
+可以使用cache标签来缓存模板片段。 在模板的顶端附近加入{% load cache %}以通知模板存取缓存标签。 模板标签{% cache %}在给定的时间内缓存了块的内容。 它至少需要两个参数: 缓存超时时间（以秒计）和指定缓存片段的名称。 示例：
+{% load cache %}
+{% cache 500 sidebar %}
+    .. sidebar ..
+{% endcache %}
+
+
+有时你可能想缓存基于片段的动态内容的多份拷贝。 比如，你想为上一个例子的每个用户分别缓存侧边栏。 这样只需要给{% cache %}传递额外的参数以标识缓存片段。
+{% load cache %}
+{% cache 500 sidebar request.user.username %}
+    .. sidebar for logged in user ..
+{% endcache %}
+
+缓存超时时间可以作为模板变量，只要它可以解析为整数值。 例如，如果模板变量my_timeout值为600，那么以下两个例子是等价的。
+{% cache 600 sidebar %} ... {% endcache %}
+{% cache my_timeout sidebar %} ... {% endcache %}
+
+
+Django初探中间件(middleware)
+中间件不需要继承任何类，可以放在任何一个地方。Django在settings.py的MIDDLEWARE_CLASSES中找到它。
+请求中间件包含process_request(self, request)方法，多个请求中间件调用的次序是其出现的次序。该方法在请求被接收和URL被解析来决定运行哪个视图之前立即调用。
+视图中间件包含process_view(self, request, view, args, kwargs) 方法，同上。该方法在请求中间件运行后和URL被解析到一个视图后和视图实际上被调用之前被调用。
+模版中间件process_template_response，多个模版相应中间件调用的次序是其出现次序的逆序
+响应中间件process_response(self, request, response)，同上。 该方法在视图方法已经调用和应答生成后调用，这是中间件修改应答输出的地方，输出压缩是应答中间件的一个应用。
+和异常中间件process_exception(self, request, exception) ，同上。只在出错并且视图触发不可捕获的异常时调用，不包括Http404异常。
+不一定都实现, 看需求. 而这些方法如果存在, 都会被保存响应的函数列表中, 待将来调用.
+get_response() 方法, 中间件调用执行的顺序是请求中间件, 视图中间件, 模版中间件, 异常中间件(可选), 响应中间件. 
